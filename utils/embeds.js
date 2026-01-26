@@ -4,7 +4,7 @@ const THEME = {
     COLOR: '#3498db',
     SUCCESS: '#2ecc71',
     ERROR: '#e74c3c',
-    FOOTER: 'Rayns • Tous droits réservés © 2026',
+    FOOTER: 'Rayns',
 };
 
 /**
@@ -30,13 +30,12 @@ const createLevelUpEmbed = (user, newLevel, source) => {
     
     return createBaseEmbed(user)
         .setColor(THEME.SUCCESS)
-        .setTitle(`🎉 NIVEAU SUPÉRIEUR !`)
+        .setTitle(`NIVEAU SUPÉRIEUR ! 🎉`)
         .setThumbnail(user.displayAvatarURL({ dynamic: true, size: 256 }))
         .setDescription(`Bravo <@${user.id}>, tu viens de passer un cap !`)
         .addFields(
-            { name: 'Nouveau Niveau', value: `**${newLevel}**`, inline: true },
-            { name: 'Source XP', value: `${emoji} ${source}`, inline: true },
-            { name: 'Prochain Rang', value: 'Bientôt...', inline: true }
+            { name: 'Niveau', value: `**${newLevel}**`, inline: true },
+            { name: 'Prochain Rang', value: 'Optimal', inline: true }
         );
 };
 
