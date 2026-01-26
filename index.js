@@ -46,7 +46,7 @@ for (const file of eventFiles) {
     }
 }
 
-client.once('ready', async () => {
+client.once('clientReady', async () => {
     console.log('🏃 Service Strava prêt à démarrer...');
     
     const rest = new REST().setToken(process.env.DISCORD_TOKEN);
