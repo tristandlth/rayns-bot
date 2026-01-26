@@ -1,0 +1,13 @@
+{
+  "name": "rayns-bot",
+  "version": "1.0.0",
+  "description": "Bot de la Rayns",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.25.1",
+    "pg": "^8.11.3"
+  }
+}
