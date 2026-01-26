@@ -4,7 +4,7 @@ const THEME = {
     COLOR: '#3498db',
     SUCCESS: '#2ecc71',
     ERROR: '#e74c3c',
-    FOOTER: 'Le Bot du Club • Système XP',
+    FOOTER: 'Rayns • Tous droits réservés © 2026',
 };
 
 /**
