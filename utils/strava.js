@@ -4,7 +4,12 @@ const { createBaseEmbed } = require('./embeds');
 const AUTH_URL = 'https://www.strava.com/oauth/token';
 const CLUB_URL = `https://www.strava.com/api/v3/clubs/${process.env.STRAVA_CLUB_ID}/activities`;
 
+const LOCAL_LOGO_PATH = './img/strava.png';
+const ATTACHMENT_NAME = 'strava.png';
+
 let lastActivityId = null; 
+
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function getAccessToken() {
     try {
@@ -19,6 +24,37 @@ async function getAccessToken() {
         console.error('Erreur Refresh Token Strava:', error.response?.data || error.message);
         return null;
     }
+}
+
+async function sendActivityEmbed(channel, activity) {
+    const distanceKm = (activity.distance / 1000).toFixed(2);
+    const timeMin = Math.floor(activity.moving_time / 60);
+    const elevation = Math.floor(activity.total_elevation_gain);
+
+    // calcul allure (min/km)
+    const secondsPerKm = activity.moving_time / (activity.distance / 1000);
+    const paceMinutes = Math.floor(secondsPerKm / 60);
+    const paceSeconds = Math.floor(secondsPerKm % 60).toString().padStart(2, '0');
+    const pace = `${paceMinutes}:${paceSeconds}/km`;
+
+    const embed = createBaseEmbed({ 
+        username: `${activity.athlete.firstname} ${activity.athlete.lastname}`, 
+        displayAvatarURL: () => `attachment://${ATTACHMENT_NAME}`
+    })
+    .setColor('#fc4c02')
+    .setTitle(`🏃 ${activity.name}`)
+    .setDescription(`Activité du club`)
+    .addFields(
+        { name: 'Distance', value: `${distanceKm} km`, inline: true },
+        { name: 'Duree', value: `${timeMin} min`, inline: true },
+        { name: 'Allure', value: `${pace}`, inline: true },
+        { name: 'Denivele', value: `${elevation} m`, inline: true }
+    );
+
+    await channel.send({ 
+        embeds: [embed],
+        files: [LOCAL_LOGO_PATH]
+     });
 }
 
 async function checkStravaActivities(client) {
@@ -45,33 +81,45 @@ async function checkStravaActivities(client) {
 
         if (latest.id !== lastActivityId) {
             lastActivityId = latest.id;
-
             const channel = client.channels.cache.get(process.env.STRAVA_CHANNEL_ID);
-            if (!channel) return;
-
-            const distanceKm = (latest.distance / 1000).toFixed(2);
-            const timeMin = Math.floor(latest.moving_time / 60);
-            
-            const embed = createBaseEmbed({ 
-                username: `${latest.athlete.firstname} ${latest.athlete.lastname}`, 
-                displayAvatarURL: () => 'https://upload.wikimedia.org/wikipedia/commons/c/cb/Strava_Logo.png'
-            })
-            .setColor('#fc4c02')
-            .setTitle(`🏃 ${latest.name}`)
-            .setDescription(`Une nouvelle activite a ete postee dans le club !`)
-            .addFields(
-                { name: 'Distance', value: `${distanceKm} km`, inline: true },
-                { name: 'Duree', value: `${timeMin} min`, inline: true },
-                { name: 'Type', value: `${latest.type}`, inline: true }
-            );
-
-            await channel.send({ embeds: [embed] });
-            console.log(`Nouvelle activite Strava postee : ${latest.name}`);
+            if (channel) {
+                await sendActivityEmbed(channel, latest);
+                console.log(`Nouvelle activite Strava postee : ${latest.name}`);
+            }
         }
-
     } catch (error) {
         console.error('Erreur API Strava:', error.response?.data || error.message);
     }
 }
 
-module.exports = { checkStravaActivities };
+async function manualSync(channel, limit = 10) {
+    console.log(`Commande Sync lancée pour ${limit} activités...`);
+    const token = await getAccessToken();
+    if (!token) return channel.send("❌ Erreur de token Strava.");
+
+    try {
+        const res = await axios.get(CLUB_URL, {
+            headers: { Authorization: `Bearer ${token}` },
+            params: { per_page: limit }
+        });
+
+        const activities = res.data;
+        if (!activities || activities.length === 0) return channel.send("Aucune activité trouvée.");
+
+        channel.send(`⏳ Récupération des ${activities.length} dernières activités en cours...`);
+
+        const sortedActivities = [...activities].reverse();
+
+        for (const activity of sortedActivities) {
+            await sendActivityEmbed(channel, activity);
+            await wait(2000);
+        }
+
+        channel.send("✅ Synchronisation terminée !");
+
+    } catch (error) {
+        channel.send(`❌ Erreur Strava : ${error.message}`);
+    }
+}
+
+module.exports = { checkStravaActivities, manualSync };

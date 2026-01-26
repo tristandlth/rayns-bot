@@ -23,7 +23,7 @@ const initDb = async () => {
             last_message_date BIGINT DEFAULT 0
         );
     `);
-    console.log("💾 Base de données prête.");
+    console.log("Base de données prête.");
 };
 
 module.exports = { db, getLevelFromXp, initDb };

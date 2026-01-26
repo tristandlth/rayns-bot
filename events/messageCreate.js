@@ -1,5 +1,7 @@
+const { PermissionsBitField } = require('discord.js');
 const { db, getLevelFromXp } = require('../utils/db');
 const { createLevelUpEmbed } = require('../utils/embeds');
+const { manualSync } = require('../utils/strava');
 
 const cooldowns = new Set();
 const XP_COOLDOWN = 5000;
@@ -9,6 +11,15 @@ module.exports = {
     async execute(message) {
         if (message.author.bot || !message.guild) return;
 
+        if (message.content === '!strava-sync') {
+            if (!message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+                return message.reply("Désolé, seul un administrateur peut lancer cette commande.");
+            }
+
+            await manualSync(message.channel, 10);
+            return;
+        }
+        
         // anti-spam
         if (cooldowns.has(message.author.id)) return;
         cooldowns.add(message.author.id);
