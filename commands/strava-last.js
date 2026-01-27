@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const { manualSync } = require('../utils/strava');
 
 module.exports = {
