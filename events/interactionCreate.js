@@ -1,3 +1,5 @@
+const { MessageFlags } = require('discord.js');
+
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction) {
@@ -14,10 +16,15 @@ module.exports = {
             await command.execute(interaction);
         } catch (error) {
             console.error(error);
+            const errorPayload = { 
+                content: 'Erreur à l\'exécution de la commande !', 
+                flags: MessageFlags.Ephemeral 
+            };
+
             if (interaction.replied || interaction.deferred) {
-                await interaction.followUp({ content: 'Il y a eu une erreur en exécutant cette commande !', flags: true });
+                await interaction.followUp(errorPayload);
             } else {
-                await interaction.reply({ content: 'Il y a eu une erreur en exécutant cette commande !', flags: true });
+                await interaction.reply(errorPayload);
             }
         }
     },

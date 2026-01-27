@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { AttachmentBuilder } = require('discord.js');
 const { createBaseEmbed } = require('./embeds');
 
 const AUTH_URL = 'https://www.strava.com/oauth/token';
@@ -27,11 +28,18 @@ async function getAccessToken() {
 }
 
 async function sendActivityEmbed(channel, activity) {
+    const logoAttachment = new AttachmentBuilder(LOCAL_LOGO_PATH, { name: ATTACHMENT_NAME });
+
+    let avatarUrl = `attachment://${ATTACHMENT_NAME}`;
+
+    if (activity.athlete && activity.athlete.profile) {
+        avatarUrl = activity.athlete.profile;
+    }
+
     const distanceKm = (activity.distance / 1000).toFixed(2);
     const timeMin = Math.floor(activity.moving_time / 60);
     const elevation = Math.floor(activity.total_elevation_gain);
 
-    // calcul allure (min/km)
     const secondsPerKm = activity.moving_time / (activity.distance / 1000);
     const paceMinutes = Math.floor(secondsPerKm / 60);
     const paceSeconds = Math.floor(secondsPerKm % 60).toString().padStart(2, '0');
@@ -39,7 +47,7 @@ async function sendActivityEmbed(channel, activity) {
 
     const embed = createBaseEmbed({ 
         username: `${activity.athlete.firstname} ${activity.athlete.lastname}`, 
-        displayAvatarURL: () => `attachment://${ATTACHMENT_NAME}`
+        displayAvatarURL: () => avatarUrl 
     })
     .setColor('#fc4c02')
     .setTitle(`🏃 ${activity.name}`)
@@ -53,7 +61,7 @@ async function sendActivityEmbed(channel, activity) {
 
     await channel.send({ 
         embeds: [embed],
-        files: [LOCAL_LOGO_PATH]
+        files: [logoAttachment]
      });
 }
 
