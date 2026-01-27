@@ -1,4 +1,5 @@
 const axios = require('axios');
+const fs = require('fs');
 const { AttachmentBuilder } = require('discord.js');
 const { createBaseEmbed } = require('./embeds');
 
@@ -8,7 +9,8 @@ const CLUB_URL = `https://www.strava.com/api/v3/clubs/${process.env.STRAVA_CLUB_
 const LOCAL_LOGO_PATH = './img/strava.png';
 const ATTACHMENT_NAME = 'strava.png';
 
-let lastActivityId = null; 
+let knownActivities = new Set();
+let isInitialized = false;
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -28,7 +30,8 @@ async function getAccessToken() {
 }
 
 async function sendActivityEmbed(channel, activity) {
-    const logoAttachment = new AttachmentBuilder(LOCAL_LOGO_PATH, { name: ATTACHMENT_NAME });
+    const fileBuffer = fs.readFileSync(LOCAL_LOGO_PATH);
+    const logoAttachment = new AttachmentBuilder(fileBuffer, { name: ATTACHMENT_NAME });
 
     let avatarUrl = `attachment://${ATTACHMENT_NAME}`;
 
@@ -73,28 +76,36 @@ async function checkStravaActivities(client) {
     try {
         const res = await axios.get(CLUB_URL, {
             headers: { Authorization: `Bearer ${token}` },
-            params: { per_page: 5 }
+            params: { per_page: 10 }
         });
 
         const activities = res.data;
         if (!activities || activities.length === 0) return;
 
-        const latest = activities[0];
-
-        if (!lastActivityId) {
-            lastActivityId = latest.id;
-            console.log(`Strava initialise. Derniere activite : ${latest.name}`);
+        if (!isInitialized) {
+            activities.forEach(activity => knownActivities.add(activity.id));
+            isInitialized = true;
+            console.log(`Strava initialisé. ${activities.length} activités ignorées (déjà existantes).`);
             return;
         }
 
-        if (latest.id !== lastActivityId) {
-            lastActivityId = latest.id;
-            const channel = client.channels.cache.get(process.env.STRAVA_CHANNEL_ID);
-            if (channel) {
-                await sendActivityEmbed(channel, latest);
-                console.log(`Nouvelle activite Strava postee : ${latest.name}`);
-            }
+        const newActivities = activities.filter(activity => !knownActivities.has(activity.id));
+
+        if (newActivities.length === 0) return;
+
+        console.log(`${newActivities.length} nouvelle(s) activité(s) détectée(s) !`);
+
+        const sortedNewActivities = newActivities.reverse();
+
+        const channel = client.channels.cache.get(process.env.STRAVA_CHANNEL_ID);
+        if (!channel) return console.error("Salon Strava introuvable.");
+
+        for (const activity of sortedNewActivities) {
+            await sendActivityEmbed(channel, activity);
+            knownActivities.add(activity.id);
+            await wait(3000);
         }
+
     } catch (error) {
         console.error('Erreur API Strava:', error.response?.data || error.message);
     }
@@ -116,7 +127,7 @@ async function manualSync(channel, limit = 10) {
 
         if (limit == 1) {
             channel.send(`⏳ Récupération de la dernière activité en cours...`);
-        }else{
+        } else {
             channel.send(`⏳ Récupération des ${activities.length} dernières activités en cours...`);
         }
 
@@ -124,6 +135,7 @@ async function manualSync(channel, limit = 10) {
 
         for (const activity of sortedActivities) {
             await sendActivityEmbed(channel, activity);
+            knownActivities.add(activity.id); 
             await wait(2000);
         }
 

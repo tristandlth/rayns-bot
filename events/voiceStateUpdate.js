@@ -1,4 +1,4 @@
-const { db, getLevelFromXp } = require('../utils/db');
+const { addXp } = require('../utils/db');
 const { createLevelUpEmbed } = require('../utils/embeds');
 
 const voiceTracker = new Map();
@@ -25,40 +25,24 @@ module.exports = {
             if (minutes < 1) return;
 
             const xpGain = minutes * XP_PER_MINUTE;
-            console.log(`XP Vocal : +${xpGain} pour ${newState.member.user.tag}`);
+            
+            const { oldLevel, newLevel } = addXp(userId, xpGain, 'voice');
 
-            try {
-                const query = `
-                    INSERT INTO users (user_id, xp_voice, level) VALUES ($1, $2, 1)
-                    ON CONFLICT (user_id) DO UPDATE 
-                    SET xp_voice = users.xp_voice + $2
-                    RETURNING xp_text, xp_voice, level;
-                `;
-                const res = await db.query(query, [userId, xpGain]);
-                const user = res.rows[0];
+            if (newLevel > oldLevel) {
+                let channel = newState.guild.channels.cache.get(process.env.LEVEL_CHANNEL_ID);
 
-                const totalXp = user.xp_text + user.xp_voice;
-                const newLevel = getLevelFromXp(totalXp);
-
-                if (newLevel > user.level) {
-                    await db.query('UPDATE users SET level = $1 WHERE user_id = $2', [newLevel, userId]);
-
-                    let channel = newState.guild.channels.cache.get(process.env.LEVEL_CHANNEL_ID);
-
-                    if (!channel) {
-                        channel = newState.guild.channels.cache.find(c => c.type === 0);
-                    }
-                    
-                    if (channel) {
-                        const userObj = newState.member.user;
-                        
-                        const embed = createLevelUpEmbed(userObj, newLevel, 'Vocal');
-                        
-                        channel.send({ content: `<@${userId}>`, embeds: [embed] });
-                    }
+                if (!channel) {
+                    channel = newState.guild.channels.cache.find(c => c.type === 0);
                 }
-            } catch (err) {
-                console.error(err);
+                
+                if (channel) {
+                    const embed = createLevelUpEmbed(newState.member.user, newLevel, 'Vocal');
+                    
+                    channel.send({ 
+                        content: `<@${userId}>`, 
+                        embeds: [embed] 
+                    });
+                }
             }
         }
     },
