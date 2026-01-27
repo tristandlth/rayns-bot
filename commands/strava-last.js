@@ -1,0 +1,13 @@
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { manualSync } = require('../utils/strava');
+
+module.exports = {
+    data: new SlashCommandBuilder()
+        .setName('strava-sync')
+        .setDescription('Force la récupération de la dernière activité'),
+    async execute(interaction) {
+        await interaction.reply({ content: '⏳ Récupération de la dernière activité', ephemeral: true });
+
+        await manualSync(interaction.channel, 1);
+    },
+};

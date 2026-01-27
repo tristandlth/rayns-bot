@@ -47,9 +47,9 @@ module.exports = {
                 const alertChannel = message.guild.channels.cache.get(process.env.LEVEL_CHANNEL_ID);
 
                 if (alertChannel) {
-                    alertChannel.send({ content: `Félicitations <@${userId}> ! 👏`, embeds: [embed] });
+                    alertChannel.send({ embeds: [embed] });
                 } else {
-                    message.channel.send({ content: `Félicitations <@${userId}> ! 👏`, embeds: [embed] });
+                    message.channel.send({ embeds: [embed] });
                 }
             }
         } catch (err) {
