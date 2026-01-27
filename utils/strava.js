@@ -106,7 +106,11 @@ async function manualSync(channel, limit = 10) {
         const activities = res.data;
         if (!activities || activities.length === 0) return channel.send("Aucune activité trouvée.");
 
-        channel.send(`⏳ Récupération des ${activities.length} dernières activités en cours...`);
+        if (limit == 1) {
+            channel.send(`⏳ Récupération de la dernière activité en cours...`);
+        }else{
+            channel.send(`⏳ Récupération des ${activities.length} dernières activités en cours...`);
+        }
 
         const sortedActivities = [...activities].reverse();
 
@@ -115,8 +119,10 @@ async function manualSync(channel, limit = 10) {
             await wait(2000);
         }
 
-        channel.send("✅ Synchronisation terminée !");
-
+        if(limit > 1){
+            channel.send("✅ Récupération terminée !");
+        }
+        
     } catch (error) {
         channel.send(`❌ Erreur Strava : ${error.message}`);
     }
