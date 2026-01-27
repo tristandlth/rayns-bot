@@ -1,10 +1,8 @@
 const { Pool } = require('pg');
 
-// On récupère l'URL de connexion depuis les variables d'environnement (Dokploy la fournit souvent)
-// Sinon il faut remplir user/host/database/password/port
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: { rejectUnauthorized: false } // Souvent nécessaire pour les hébergeurs cloud
+    ssl: false
 });
 
 const initDb = async () => {
@@ -20,28 +18,24 @@ const initDb = async () => {
                 last_message_date BIGINT DEFAULT 0
             );
         `);
-        console.log("✅ Table 'levels' vérifiée/créée (PostgreSQL).");
+        console.log("Table 'levels' vérifiée/créée.");
     } catch (err) {
-        console.error("❌ Erreur init DB:", err);
+        console.error("Erreur init DB:", err);
     } finally {
         client.release();
     }
 };
 
-// Fonction pour ajouter de l'XP
 const addXp = async (userId, xpToAdd, type = 'text') => {
     const client = await pool.connect();
     try {
-        // 1. On essaie de récupérer l'utilisateur
         const res = await client.query('SELECT * FROM levels WHERE user_id = $1', [userId]);
         let user = res.rows[0];
 
-        // Valeurs par défaut si l'user n'existe pas
         if (!user) {
             user = { experience: 0, level: 0, msg_count: 0, voice_min: 0 };
         }
 
-        // 2. Calculs
         const newXp = user.experience + xpToAdd;
         const currentLevel = user.level;
         const nextLevelXp = 75 * ((currentLevel + 1) ** 2);
@@ -51,12 +45,9 @@ const addXp = async (userId, xpToAdd, type = 'text') => {
             newLevel++;
         }
 
-        // Préparation des données mises à jour
         const msgIncrement = type === 'text' ? 1 : 0;
-        const voiceIncrement = type === 'voice' ? (xpToAdd / 10) : 0; // xpToAdd=10 -> 1 min
+        const voiceIncrement = type === 'voice' ? (xpToAdd / 10) : 0;
 
-        // 3. Requete UPSERT (Update ou Insert)
-        // PostgreSQL gère ça avec "ON CONFLICT"
         await client.query(`
             INSERT INTO levels (user_id, experience, level, msg_count, voice_min, last_message_date)
             VALUES ($1, $2, $3, $4, $5, $6)
@@ -68,12 +59,7 @@ const addXp = async (userId, xpToAdd, type = 'text') => {
                 voice_min = levels.voice_min + excluded.voice_min,
                 last_message_date = excluded.last_message_date;
         `, [
-            userId, 
-            newXp, 
-            newLevel, 
-            msgIncrement, 
-            voiceIncrement, 
-            Date.now()
+            userId, newXp, newLevel, msgIncrement, voiceIncrement, Date.now()
         ]);
 
         return { oldLevel: currentLevel, newLevel };
@@ -89,7 +75,6 @@ const addXp = async (userId, xpToAdd, type = 'text') => {
 const getLeaderboard = async (limit = 10) => {
     try {
         const res = await pool.query('SELECT * FROM levels ORDER BY experience DESC LIMIT $1', [limit]);
-        // On mappe les noms de colonnes (snake_case -> camelCase) pour que tes commandes fonctionnent
         return res.rows.map(row => ({
             userId: row.user_id,
             experience: row.experience,
