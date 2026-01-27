@@ -15,7 +15,7 @@ module.exports = {
 
         const xpGain = Math.floor(Math.random() * 11) + 15;
 
-        const { oldLevel, newLevel } = addXp(message.author.id, xpGain, 'text');
+        const { oldLevel, newLevel } = await addXp(message.author.id, xpGain, 'text');
 
         if (newLevel > oldLevel) {
             const embed = createLevelUpEmbed(message.author, newLevel, 'Texte');

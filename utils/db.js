@@ -1,74 +1,128 @@
-const Database = require('better-sqlite3');
-const db = new Database('levels.sqlite');
+const { Pool } = require('pg');
 
-const initDb = () => {
-    db.prepare(`
-        CREATE TABLE IF NOT EXISTS levels (
-            userId TEXT PRIMARY KEY,
-            experience INTEGER DEFAULT 0,
-            level INTEGER DEFAULT 0,
-            msgCount INTEGER DEFAULT 0,
-            voiceMin INTEGER DEFAULT 0,
-            lastMessageDate INTEGER DEFAULT 0
-        )
-    `).run();
+// On récupère l'URL de connexion depuis les variables d'environnement (Dokploy la fournit souvent)
+// Sinon il faut remplir user/host/database/password/port
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false } // Souvent nécessaire pour les hébergeurs cloud
+});
+
+const initDb = async () => {
+    const client = await pool.connect();
+    try {
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS levels (
+                user_id VARCHAR(255) PRIMARY KEY,
+                experience INTEGER DEFAULT 0,
+                level INTEGER DEFAULT 0,
+                msg_count INTEGER DEFAULT 0,
+                voice_min INTEGER DEFAULT 0,
+                last_message_date BIGINT DEFAULT 0
+            );
+        `);
+        console.log("✅ Table 'levels' vérifiée/créée (PostgreSQL).");
+    } catch (err) {
+        console.error("❌ Erreur init DB:", err);
+    } finally {
+        client.release();
+    }
 };
 
-const addXp = (userId, xpToAdd, type = 'text') => {
-    const user = db.prepare('SELECT * FROM levels WHERE userId = ?').get(userId);
+// Fonction pour ajouter de l'XP
+const addXp = async (userId, xpToAdd, type = 'text') => {
+    const client = await pool.connect();
+    try {
+        // 1. On essaie de récupérer l'utilisateur
+        const res = await client.query('SELECT * FROM levels WHERE user_id = $1', [userId]);
+        let user = res.rows[0];
 
-    if (!user) {
-        db.prepare(`
-            INSERT INTO levels (userId, experience, level, msgCount, voiceMin) 
-            VALUES (?, ?, ?, ?, ?)
-        `).run(
+        // Valeurs par défaut si l'user n'existe pas
+        if (!user) {
+            user = { experience: 0, level: 0, msg_count: 0, voice_min: 0 };
+        }
+
+        // 2. Calculs
+        const newXp = user.experience + xpToAdd;
+        const currentLevel = user.level;
+        const nextLevelXp = 75 * ((currentLevel + 1) ** 2);
+        let newLevel = currentLevel;
+
+        if (newXp >= nextLevelXp) {
+            newLevel++;
+        }
+
+        // Préparation des données mises à jour
+        const msgIncrement = type === 'text' ? 1 : 0;
+        const voiceIncrement = type === 'voice' ? (xpToAdd / 10) : 0; // xpToAdd=10 -> 1 min
+
+        // 3. Requete UPSERT (Update ou Insert)
+        // PostgreSQL gère ça avec "ON CONFLICT"
+        await client.query(`
+            INSERT INTO levels (user_id, experience, level, msg_count, voice_min, last_message_date)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            ON CONFLICT (user_id) 
+            DO UPDATE SET 
+                experience = excluded.experience,
+                level = excluded.level,
+                msg_count = levels.msg_count + excluded.msg_count,
+                voice_min = levels.voice_min + excluded.voice_min,
+                last_message_date = excluded.last_message_date;
+        `, [
             userId, 
-            xpToAdd, 
-            0, 
-            type === 'text' ? 1 : 0,
-            type === 'voice' ? 1 : 0
-        );
+            newXp, 
+            newLevel, 
+            msgIncrement, 
+            voiceIncrement, 
+            Date.now()
+        ]);
+
+        return { oldLevel: currentLevel, newLevel };
+
+    } catch (err) {
+        console.error("Erreur addXp:", err);
         return { oldLevel: 0, newLevel: 0 };
+    } finally {
+        client.release();
     }
+};
 
-    const newXp = user.experience + xpToAdd;
-    const currentLevel = user.level;
-    const nextLevelXp = 75 * ((currentLevel + 1) ** 2);
-    let newLevel = currentLevel;
-
-    if (newXp >= nextLevelXp) {
-        newLevel++;
+const getLeaderboard = async (limit = 10) => {
+    try {
+        const res = await pool.query('SELECT * FROM levels ORDER BY experience DESC LIMIT $1', [limit]);
+        // On mappe les noms de colonnes (snake_case -> camelCase) pour que tes commandes fonctionnent
+        return res.rows.map(row => ({
+            userId: row.user_id,
+            experience: row.experience,
+            level: row.level
+        }));
+    } catch (err) {
+        console.error(err);
+        return [];
     }
+};
 
-    if (type === 'text') {
-        db.prepare(`
-            UPDATE levels 
-            SET experience = ?, level = ?, msgCount = msgCount + 1, lastMessageDate = ? 
-            WHERE userId = ?
-        `).run(newXp, newLevel, Date.now(), userId);
-    } else {
-        const minutesToAdd = xpToAdd / 10; 
+const getUserRank = async (userId) => {
+    try {
+        const res = await pool.query('SELECT * FROM levels WHERE user_id = $1', [userId]);
+        const user = res.rows[0];
         
-        db.prepare(`
-            UPDATE levels 
-            SET experience = ?, level = ?, voiceMin = voiceMin + ? 
-            WHERE userId = ?
-        `).run(newXp, newLevel, minutesToAdd, userId);
+        if (!user) return null;
+
+        const rankRes = await pool.query('SELECT COUNT(*) as count FROM levels WHERE experience > $1', [user.experience]);
+        const rank = parseInt(rankRes.rows[0].count) + 1;
+
+        return { 
+            userId: user.user_id,
+            experience: user.experience,
+            level: user.level,
+            msgCount: user.msg_count,
+            voiceMin: user.voice_min,
+            rank 
+        };
+    } catch (err) {
+        console.error(err);
+        return null;
     }
-
-    return { oldLevel: currentLevel, newLevel };
-};
-
-const getLeaderboard = (limit = 10) => {
-    return db.prepare('SELECT * FROM levels ORDER BY experience DESC LIMIT ?').all(limit);
-};
-
-const getUserRank = (userId) => {
-    const user = db.prepare('SELECT * FROM levels WHERE userId = ?').get(userId);
-    if (!user) return null;
-    
-    const rank = db.prepare('SELECT COUNT(*) as count FROM levels WHERE experience > ?').get(user.experience).count + 1;
-    return { ...user, rank };
 };
 
 module.exports = { initDb, addXp, getLeaderboard, getUserRank };

@@ -1,12 +1,9 @@
+require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const { Client, GatewayIntentBits, Partials, Collection, REST, Routes } = require('discord.js');
-const http = require('http');
+const { Client, Collection, GatewayIntentBits } = require('discord.js');
+const { initDb } = require('./utils/db');
 const { checkStravaActivities } = require('./utils/strava');
-
-http.createServer((req, res) => {
-    res.writeHead(200); res.end('Bot en ligne');
-}).listen(3000);
 
 const client = new Client({
     intents: [
@@ -15,30 +12,30 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildMembers
-    ],
-    partials: [Partials.Channel]
+    ]
 });
 
 client.commands = new Collection();
+
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-const commandsToRegister = [];
 
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
     const command = require(filePath);
     if ('data' in command && 'execute' in command) {
         client.commands.set(command.data.name, command);
-        commandsToRegister.push(command.data.toJSON());
     } else {
-        console.log(`[AVERTISSEMENT] La commande ${filePath} manque de "data" ou "execute".`);
+        console.log(`[WARNING] La commande ${filePath} n'a pas les propriétés "data" ou "execute".`);
     }
 }
 
-const eventFiles = fs.readdirSync('./events').filter(file => file.endsWith('.js'));
+const eventsPath = path.join(__dirname, 'events');
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
 for (const file of eventFiles) {
-    const event = require(`./events/${file}`);
+    const filePath = path.join(eventsPath, file);
+    const event = require(filePath);
     if (event.once) {
         client.once(event.name, (...args) => event.execute(...args));
     } else {
@@ -46,24 +43,15 @@ for (const file of eventFiles) {
     }
 }
 
-client.once('clientReady', async () => {
-    console.log('🏃 Service Strava prêt à démarrer...');
-    
-    const rest = new REST().setToken(process.env.DISCORD_TOKEN);
-    try {
-        console.log(`Mise à jour de ${commandsToRegister.length} commandes (/) ...`);
-        
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: commandsToRegister },
-        );
-        console.log('✅ Commandes (/) enregistrées avec succès !');
-    } catch (error) {
-        console.error(error);
-    }
+client.once('ready', async () => {
+    console.log(`Connecté en tant que ${client.user.tag}`);
 
-    setTimeout(() => { checkStravaActivities(client); }, 5000);
-    setInterval(() => { checkStravaActivities(client); }, 900000);
+    await initDb();
+
+    checkStravaActivities(client);
+    setInterval(() => {
+        checkStravaActivities(client);
+    }, 15 * 60 * 1000); 
 });
 
 client.login(process.env.DISCORD_TOKEN);
