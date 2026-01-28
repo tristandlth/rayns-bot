@@ -44,7 +44,7 @@ module.exports = {
             ) {
                 result = "🏆 Tu as gagné !";
             } else {
-                result = "💀 J'ai gagné !";
+                result = "💀 Tu as perdu";
             }
 
             const disabledRow = new ActionRowBuilder()
