@@ -21,8 +21,7 @@ module.exports = {
             const embed = createLevelUpEmbed(message.author, newLevel, 'Texte');
             const alertChannel = message.guild.channels.cache.get(process.env.LEVEL_CHANNEL_ID) || message.channel;
 
-            alertChannel.send({ 
-                content: `Félicitations <@${message.author.id}> ! 👏`,
+            alertChannel.send({
                 embeds: [embed] 
             });
         }

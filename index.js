@@ -1,7 +1,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const { Client, Collection, GatewayIntentBits } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, Events, REST, Routes } = require('discord.js');
 const { initDb } = require('./utils/db');
 const { checkStravaActivities } = require('./utils/strava');
 
@@ -16,6 +16,7 @@ const client = new Client({
 });
 
 client.commands = new Collection();
+const commandsArray = [];
 
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -25,6 +26,7 @@ for (const file of commandFiles) {
     const command = require(filePath);
     if ('data' in command && 'execute' in command) {
         client.commands.set(command.data.name, command);
+        commandsArray.push(command.data.toJSON());
     } else {
         console.log(`[WARNING] La commande ${filePath} n'a pas les propriétés "data" ou "execute".`);
     }
@@ -43,10 +45,25 @@ for (const file of eventFiles) {
     }
 }
 
-client.once('ready', async () => {
-    console.log(`Connecté en tant que ${client.user.tag}`);
+client.once(Events.ClientReady, async () => {
+    console.log(`✅ Connecté en tant que ${client.user.tag}`);
 
     await initDb();
+
+    const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+
+    try {
+        console.log(`🔄 Mise à jour de ${commandsArray.length} commandes (/) ...`);
+
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: commandsArray },
+        );
+
+        console.log('Commandes (/) enregistrées avec succès !');
+    } catch (error) {
+        console.error('Erreur lors du déploiement des commandes :', error);
+    }
 
     checkStravaActivities(client);
     setInterval(() => {

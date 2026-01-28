@@ -38,8 +38,7 @@ module.exports = {
                 if (channel) {
                     const embed = createLevelUpEmbed(newState.member.user, newLevel, 'Vocal');
                     
-                    channel.send({ 
-                        content: `<@${userId}>`, 
+                    channel.send({
                         embeds: [embed] 
                     });
                 }
