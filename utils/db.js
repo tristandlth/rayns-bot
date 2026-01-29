@@ -18,13 +18,28 @@ const initDb = async () => {
                 last_message_date BIGINT DEFAULT 0
             );
         `);
-        console.log("Table 'levels' vérifiée/créée.");
+
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS bot_settings (
+                key VARCHAR(50) PRIMARY KEY,
+                value TEXT
+            );
+        `);
+
+        await client.query(`
+            INSERT INTO bot_settings (key, value) 
+            VALUES ('strava_last_id', '0') 
+            ON CONFLICT (key) DO NOTHING;
+        `);
+
+        console.log("✅ Tables 'levels' et 'bot_settings' vérifiées.");
     } catch (err) {
-        console.error("Erreur init DB:", err);
+        console.error("❌ Erreur init DB:", err);
     } finally {
         client.release();
     }
 };
+
 
 const addXp = async (userId, xpToAdd, type = 'text') => {
     const client = await pool.connect();
@@ -110,4 +125,32 @@ const getUserRank = async (userId) => {
     }
 };
 
-module.exports = { initDb, addXp, getLeaderboard, getUserRank };
+
+const getStravaLastId = async () => {
+    try {
+        const res = await pool.query("SELECT value FROM bot_settings WHERE key = 'strava_last_id'");
+        if (res.rows.length > 0) return res.rows[0].value;
+        return '0';
+    } catch (err) {
+        console.error("❌ Erreur lecture DB Strava:", err);
+        return '0';
+    }
+};
+
+const updateStravaLastId = async (newId) => {
+    try {
+        await pool.query("UPDATE bot_settings SET value = $1 WHERE key = 'strava_last_id'", [String(newId)]);
+        console.log(`💾 ID Strava sauvegardé : ${newId}`);
+    } catch (err) {
+        console.error("❌ Erreur sauvegarde DB Strava:", err);
+    }
+};
+
+module.exports = { 
+    initDb, 
+    addXp, 
+    getLeaderboard, 
+    getUserRank, 
+    getStravaLastId, 
+    updateStravaLastId 
+};
