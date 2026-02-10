@@ -28,7 +28,7 @@ module.exports = {
             
             const { oldLevel, newLevel } = await addXp(userId, xpGain, 'voice');
 
-            if (newLevel > oldLevel) {
+            if (newLevel > oldLevel && newLevel % 5 === 0) {
                 let channel = newState.guild.channels.cache.get(process.env.LEVEL_CHANNEL_ID);
 
                 if (!channel) {

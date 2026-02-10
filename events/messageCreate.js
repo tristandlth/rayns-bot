@@ -17,7 +17,7 @@ module.exports = {
 
         const { oldLevel, newLevel } = await addXp(message.author.id, xpGain, 'text');
 
-        if (newLevel > oldLevel) {
+        if (newLevel > oldLevel && newLevel % 5 === 0) {
             const embed = createLevelUpEmbed(message.author, newLevel, 'Texte');
             const alertChannel = message.guild.channels.cache.get(process.env.LEVEL_CHANNEL_ID) || message.channel;
 
