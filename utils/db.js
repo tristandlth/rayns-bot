@@ -146,11 +146,112 @@ const updateStravaLastId = async (newId) => {
     }
 };
 
+// LOL TRACKING
+const initLolTables = async () => {
+    const client = await pool.connect();
+    try {
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS lol_players (
+                puuid VARCHAR(100) PRIMARY KEY,
+                display_name VARCHAR(100) NOT NULL,
+                riot_id VARCHAR(100) NOT NULL,
+                added_at BIGINT DEFAULT 0
+            );
+        `);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS lol_last_match (
+                puuid VARCHAR(100) PRIMARY KEY,
+                match_id VARCHAR(50) DEFAULT NULL
+            );
+        `);
+        console.log("✅ Tables LoL vérifiées.");
+    } catch (err) {
+        console.error("❌ Erreur init tables LoL:", err);
+    } finally {
+        client.release();
+    }
+};
+
+const getLolPlayers = async () => {
+    try {
+        const res = await pool.query('SELECT * FROM lol_players ORDER BY added_at ASC');
+        return res.rows;
+    } catch (err) {
+        console.error("❌ Erreur getLolPlayers:", err);
+        return [];
+    }
+};
+
+const addLolPlayer = async (puuid, riotId, displayName) => {
+    try {
+        await pool.query(`
+            INSERT INTO lol_players (puuid, display_name, riot_id, added_at)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (puuid) DO UPDATE SET display_name = $2, riot_id = $3;
+        `, [puuid, displayName, riotId, Date.now()]);
+        return true;
+    } catch (err) {
+        console.error("❌ Erreur addLolPlayer:", err);
+        return false;
+    }
+};
+
+const removeLolPlayer = async (puuid) => {
+    try {
+        const res = await pool.query('DELETE FROM lol_players WHERE puuid = $1 RETURNING *', [puuid]);
+        await pool.query('DELETE FROM lol_last_match WHERE puuid = $1', [puuid]);
+        return res.rowCount > 0;
+    } catch (err) {
+        console.error("❌ Erreur removeLolPlayer:", err);
+        return false;
+    }
+};
+
+const getLolLastMatchId = async (puuid) => {
+    try {
+        const res = await pool.query('SELECT match_id FROM lol_last_match WHERE puuid = $1', [puuid]);
+        return res.rows[0]?.match_id || null;
+    } catch (err) {
+        console.error("❌ Erreur getLolLastMatchId:", err);
+        return null;
+    }
+};
+
+const updateLolLastMatchId = async (puuid, matchId) => {
+    try {
+        await pool.query(`
+            INSERT INTO lol_last_match (puuid, match_id)
+            VALUES ($1, $2)
+            ON CONFLICT (puuid) DO UPDATE SET match_id = $2;
+        `, [puuid, matchId]);
+    } catch (err) {
+        console.error("❌ Erreur updateLolLastMatchId:", err);
+    }
+};
+
+const getLolPlayerByRiotId = async (riotId) => {
+    try {
+        const res = await pool.query('SELECT * FROM lol_players WHERE LOWER(riot_id) = LOWER($1)', [riotId]);
+        return res.rows[0] || null;
+    } catch (err) {
+        console.error("❌ Erreur getLolPlayerByRiotId:", err);
+        return null;
+    }
+};
+
 module.exports = { 
     initDb, 
     addXp, 
     getLeaderboard, 
     getUserRank, 
     getStravaLastId, 
-    updateStravaLastId 
+    updateStravaLastId,
+    // LoL
+    initLolTables,
+    getLolPlayers,
+    addLolPlayer,
+    removeLolPlayer,
+    getLolLastMatchId,
+    updateLolLastMatchId,
+    getLolPlayerByRiotId,
 };

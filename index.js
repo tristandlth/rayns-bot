@@ -2,8 +2,9 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { Client, Collection, GatewayIntentBits, Events, REST, Routes } = require('discord.js');
-const { initDb } = require('./utils/db');
+const { initDb, initLolTables } = require('./utils/db');
 const { checkStravaActivities } = require('./utils/strava');
+const { checkLolGames } = require('./utils/lol');
 
 const client = new Client({
     intents: [
@@ -49,6 +50,7 @@ client.once(Events.ClientReady, async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
 
     await initDb();
+    await initLolTables();
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
@@ -69,6 +71,13 @@ client.once(Events.ClientReady, async () => {
     setInterval(() => {
         checkStravaActivities(client);
     }, 15 * 60 * 1000); 
+
+    setTimeout(() => {
+        checkLolGames(client);
+        setInterval(() => {
+            checkLolGames(client);
+        }, 5 * 60 * 1000);
+    }, 30 * 1000);
 });
 
 client.login(process.env.DISCORD_TOKEN);
