@@ -57,6 +57,39 @@ async function getMatchDetails(matchId) {
     return await riotGet(url);
 }
 
+// Calcule le streak actuel (victoires ou défaites consécutives) sur les 10 dernières parties
+async function getStreak(puuid) {
+    try {
+        const matchIds = await getRecentMatches(puuid, 10);
+        if (!matchIds || matchIds.length === 0) return null;
+
+        let streak = { win: null, count: 0 };
+
+        for (const matchId of matchIds) {
+            await wait(800);
+            const matchData = await getMatchDetails(matchId);
+            if (!matchData) continue;
+            if (![420, 440].includes(matchData.info.queueId)) continue;
+
+            const p = matchData.info.participants.find(p => p.puuid === puuid);
+            if (!p) continue;
+
+            if (streak.win === null) {
+                streak.win = p.win;
+                streak.count = 1;
+            } else if (p.win === streak.win) {
+                streak.count++;
+            } else {
+                break;
+            }
+        }
+
+        return streak.count >= 3 ? streak : null;
+    } catch {
+        return null;
+    }
+}
+
 async function checkLolGames(client) {
     if (!RIOT_API_KEY) {
         console.error('❌ RIOT_API_KEY manquante dans .env');
@@ -110,13 +143,15 @@ async function checkLolGames(client) {
                 if (!participant) continue;
 
                 const rankInfo = await getRankedInfo(player.puuid);
+                const streak = await getStreak(player.puuid);
 
                 try {
                     const imageBuffer = await generateMatchCard(
                         { displayName: player.display_name },
                         participant,
                         matchData,
-                        rankInfo
+                        rankInfo,
+                        streak
                     );
 
                     const attachment = new AttachmentBuilder(imageBuffer, { name: 'match.png' });
