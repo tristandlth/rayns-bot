@@ -186,23 +186,22 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         const winrate = ((r.wins / (r.wins + r.losses)) * 100).toFixed(0);
         const noDiv = ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(r.tier);
 
-        const tierCapitalized = r.tier.charAt(0) + r.tier.slice(1).toLowerCase();
         const rankLogoUrl = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/ranked-emblem/emblem-${r.tier.toLowerCase()}.png`;
         const rankLogo = await fetchImage(rankLogoUrl);
         if (rankLogo) {
-            ctx.drawImage(rankLogo, 135, 150, 38, 38);
+            ctx.drawImage(rankLogo, 130, 145, 80, 80);
         }
 
         ctx.fillStyle = rankColor;
         ctx.font = 'bold 17px sans-serif';
-        ctx.fillText(noDiv ? r.tier : `${r.tier} ${r.rank}`, 180, 172);
+        ctx.fillText(noDiv ? r.tier : `${r.tier} ${r.rank}`, 220, 172);
 
         ctx.fillStyle = '#dddddd';
         ctx.font = '13px sans-serif';
-        ctx.fillText(`${r.leaguePoints} LP  |  ${r.wins}V / ${r.losses}D  |  ${winrate}% WR`, 180, 192);
+        ctx.fillText(`${r.leaguePoints} LP  |  ${r.wins}V / ${r.losses}D  |  ${winrate}% WR`, 220, 192);
 
         if (!noDiv) {
-            const barX = 180;
+            const barX = 220;
             const barY = 200;
             const barW = 200;
             const barH = 6;
