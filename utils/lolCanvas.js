@@ -189,7 +189,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         const rankLogoUrl = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/ranked-emblem/emblem-${r.tier.toLowerCase()}.png`;
         const rankLogo = await fetchImage(rankLogoUrl);
         if (rankLogo) {
-            const logoSize = 90;
+            const logoSize = 250;
             const ratio = rankLogo.width / rankLogo.height;
             const logoW = logoSize * ratio;
             const logoH = logoSize;
