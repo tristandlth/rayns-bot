@@ -187,7 +187,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         const noDiv = ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(r.tier);
 
         const tierCapitalized = r.tier.charAt(0) + r.tier.slice(1).toLowerCase();
-        const rankLogoUrl = `https://ddragon.leagueoflegends.com/cdn/img/ranked-emblems/Emblem_${tierCapitalized}.png`;
+        const rankLogoUrl = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/ranked-emblem/emblem-${r.tier.toLowerCase()}.png`;
         const rankLogo = await fetchImage(rankLogoUrl);
         if (rankLogo) {
             ctx.drawImage(rankLogo, 135, 150, 38, 38);
