@@ -3,7 +3,7 @@ const axios = require('axios');
 const path = require('path');
 
 const WIDTH = 900;
-const HEIGHT = 480;
+const HEIGHT = 420;
 
 const RANK_COLORS = {
     IRON: '#8a8a8a',
@@ -25,9 +25,14 @@ const QUEUE_NAMES = {
 
 const ARCANE_CHAMPIONS = {
     'Jinx': path.join(__dirname, '../img/arcane/jinx.jpg'),
+    'Vi': path.join(__dirname, '../img/arcane/vi.jpg'),
+    'Jayce': path.join(__dirname, '../img/arcane/jayce.jpg'),
+    'Caitlyn': path.join(__dirname, '../img/arcane/caitlyn.jpg'),
+    'Viktor': path.join(__dirname, '../img/arcane/viktor.jpg'),
+    'Ekko': path.join(__dirname, '../img/arcane/ekko.jpg'),
+    'Singed': path.join(__dirname, '../img/arcane/singed.jpg'),
 };
 
-// Cache
 let ddragonVersion = null;
 const imageCache = new Map();
 
@@ -73,12 +78,12 @@ function roundRect(ctx, x, y, w, h, r) {
     ctx.closePath();
 }
 
-async function generateMatchCard(player, participant, match, rankInfo, streak) {
+async function generateMatchCard(player, participant, match, rankInfo) {
     const version = await getDdragonVersion();
     const canvas = createCanvas(WIDTH, HEIGHT);
     const ctx = canvas.getContext('2d');
 
-    const win = participant.win;
+    const win = participant.win === true || participant.win === 'Win';
     const champion = participant.championName;
     const kills = participant.kills;
     const deaths = participant.deaths;
@@ -122,7 +127,7 @@ async function generateMatchCard(player, participant, match, rankInfo, streak) {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-    // Barre gauche victoire/défaite
+    // Barre couleur gauche
     ctx.fillStyle = win ? '#2ecc71' : '#e74c3c';
     ctx.fillRect(0, 0, 5, HEIGHT);
 
@@ -144,7 +149,7 @@ async function generateMatchCard(player, participant, match, rankInfo, streak) {
         ctx.stroke();
     }
 
-    // Niveau du champion (badge)
+    // Badge niveau champion
     roundRect(ctx, 46, 112, 48, 20, 4);
     ctx.fillStyle = 'rgba(0,0,0,0.8)';
     ctx.fill();
@@ -159,19 +164,8 @@ async function generateMatchCard(player, participant, match, rankInfo, streak) {
     ctx.font = 'bold 26px sans-serif';
     ctx.fillText(win ? 'VICTOIRE' : 'DEFAITE', 140, 58);
 
-    // Streak
-    if (streak && streak.count >= 3) {
-        const streakColor = streak.win ? '#f39c12' : '#e74c3c';
-        const streakText = streak.win
-            ? `${streak.count} victoires consecutives`
-            : `${streak.count} defaites consecutives`;
-        ctx.fillStyle = streakColor;
-        ctx.font = 'bold 13px sans-serif';
-        ctx.fillText(`[ ${streakText} ]`, 300, 55);
-    }
-
-    // Nom champion en doré
-    ctx.fillStyle = '#c89b3c';
+    // Nom champion en blanc
+    ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 22px sans-serif';
     ctx.fillText(champion, 140, 90);
 
@@ -182,43 +176,46 @@ async function generateMatchCard(player, participant, match, rankInfo, streak) {
     if (multikill) {
         ctx.fillStyle = '#f39c12';
         ctx.font = 'bold 14px sans-serif';
-        ctx.fillText(`** ${multikill} **`, 140, 140);
+        ctx.fillText(multikill, 140, 140);
     }
 
-    // Rang
+    // Logo et infos de rang
     if (rankInfo?.solo) {
         const r = rankInfo.solo;
         const rankColor = RANK_COLORS[r.tier] || '#ffffff';
         const winrate = ((r.wins / (r.wins + r.losses)) * 100).toFixed(0);
         const noDiv = ['MASTER', 'GRANDMASTER', 'CHALLENGER'].includes(r.tier);
 
+        const tierCapitalized = r.tier.charAt(0) + r.tier.slice(1).toLowerCase();
+        const rankLogoUrl = `https://ddragon.leagueoflegends.com/cdn/img/ranked-emblems/Emblem_${tierCapitalized}.png`;
+        const rankLogo = await fetchImage(rankLogoUrl);
+        if (rankLogo) {
+            ctx.drawImage(rankLogo, 135, 150, 38, 38);
+        }
+
         ctx.fillStyle = rankColor;
         ctx.font = 'bold 17px sans-serif';
-        ctx.fillText(noDiv ? r.tier : `${r.tier} ${r.rank}`, 140, 172);
+        ctx.fillText(noDiv ? r.tier : `${r.tier} ${r.rank}`, 180, 172);
 
         ctx.fillStyle = '#dddddd';
         ctx.font = '13px sans-serif';
-        ctx.fillText(`${r.leaguePoints} LP  |  ${r.wins}V / ${r.losses}D  |  ${winrate}% WR`, 140, 192);
+        ctx.fillText(`${r.leaguePoints} LP  |  ${r.wins}V / ${r.losses}D  |  ${winrate}% WR`, 180, 192);
 
-        // Barre LP (seulement si pas Master+)
         if (!noDiv) {
-            const barX = 140;
+            const barX = 180;
             const barY = 200;
-            const barW = 220;
+            const barW = 200;
             const barH = 6;
-            const progress = r.leaguePoints / 100;
-
             roundRect(ctx, barX, barY, barW, barH, 3);
             ctx.fillStyle = 'rgba(255,255,255,0.15)';
             ctx.fill();
-
-            roundRect(ctx, barX, barY, Math.round(barW * progress), barH, 3);
+            roundRect(ctx, barX, barY, Math.round(barW * (r.leaguePoints / 100)), barH, 3);
             ctx.fillStyle = rankColor;
             ctx.fill();
         }
     }
 
-    // ── Séparateur ─────────────────────────────────────────────────────────
+    // Séparateur
     ctx.strokeStyle = 'rgba(255,255,255,0.1)';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -226,7 +223,7 @@ async function generateMatchCard(player, participant, match, rankInfo, streak) {
     ctx.lineTo(620, 228);
     ctx.stroke();
 
-    // Stats
+    // Blocs stats
     const stats = [
         { label: 'KDA', value: `${kills} / ${deaths} / ${assists}`, sub: `Ratio ${kda}` },
         { label: 'CS', value: cs.toString(), sub: `${csPerMin}/min` },
@@ -242,8 +239,7 @@ async function generateMatchCard(player, participant, match, rankInfo, streak) {
 
     stats.forEach((stat, i) => {
         const x = statStartX + i * (statW + statGap);
-
-        roundRect(ctx, x, statY, statW, 95, 8);
+        roundRect(ctx, x, statY, statW, 90, 8);
         ctx.fillStyle = 'rgba(255,255,255,0.07)';
         ctx.fill();
 
@@ -259,13 +255,13 @@ async function generateMatchCard(player, participant, match, rankInfo, streak) {
         if (stat.sub) {
             ctx.fillStyle = '#888888';
             ctx.font = '11px sans-serif';
-            ctx.fillText(stat.sub, x + statW / 2, statY + 76);
+            ctx.fillText(stat.sub, x + statW / 2, statY + 74);
         }
     });
 
     ctx.textAlign = 'left';
 
-    // Items
+    // Items (2 rangées de 3)
     const itemIds = [
         participant.item0, participant.item1, participant.item2,
         participant.item3, participant.item4, participant.item5,
@@ -282,7 +278,6 @@ async function generateMatchCard(player, participant, match, rankInfo, streak) {
         const y = itemStartY + row * (itemSize + 4);
         const imgUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemIds[i]}.png`;
         const img = await fetchImage(imgUrl);
-
         roundRect(ctx, x, y, itemSize, itemSize, 4);
         if (img) {
             ctx.save();
@@ -313,15 +308,13 @@ async function generateMatchCard(player, participant, match, rankInfo, streak) {
     const team1 = match.info.participants.filter(p => p.teamId === 100);
     const team2 = match.info.participants.filter(p => p.teamId === 200);
     const champSize = 32;
-    const compoY = 360;
+    const compoY = HEIGHT - champSize - 15;
 
-    // Label équipes
-    ctx.fillStyle = '#666666';
+    ctx.fillStyle = '#555555';
     ctx.font = '11px sans-serif';
-    ctx.fillText('Equipe 1', 25, compoY - 6);
-    ctx.fillText('Equipe 2', 25 + 5 * (champSize + 4) + 30, compoY - 6);
+    ctx.fillText('Equipe 1', 25, compoY - 5);
+    ctx.fillText('Equipe 2', 25 + 5 * (champSize + 4) + 30, compoY - 5);
 
-    // VS
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 13px sans-serif';
     ctx.textAlign = 'center';
@@ -330,16 +323,13 @@ async function generateMatchCard(player, participant, match, rankInfo, streak) {
 
     for (const [teamIndex, team] of [team1, team2].entries()) {
         const offsetX = teamIndex === 0 ? 25 : 25 + 5 * (champSize + 4) + 30;
-
         for (let i = 0; i < team.length; i++) {
             const p = team[i];
             const x = offsetX + i * (champSize + 4);
             const isTracked = p.puuid === participant.puuid;
-
             const iconUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${p.championName}.png`;
             const icon = await fetchImage(iconUrl);
 
-            // Cercle clip
             ctx.save();
             ctx.beginPath();
             ctx.arc(x + champSize / 2, compoY + champSize / 2, champSize / 2, 0, Math.PI * 2);
@@ -352,7 +342,6 @@ async function generateMatchCard(player, participant, match, rankInfo, streak) {
             }
             ctx.restore();
 
-            // Bordure — dorée si c'est le joueur suivi, sinon semi-transparente
             ctx.strokeStyle = isTracked ? '#c89b3c' : 'rgba(255,255,255,0.2)';
             ctx.lineWidth = isTracked ? 2.5 : 1;
             ctx.beginPath();
