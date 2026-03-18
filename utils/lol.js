@@ -1,6 +1,7 @@
 const axios = require('axios');
-const { EmbedBuilder } = require('discord.js');
+const { AttachmentBuilder } = require('discord.js');
 const { getLolPlayers, getLolLastMatchId, updateLolLastMatchId } = require('./db');
+const { generateMatchCard } = require('./lolCanvas');
 
 const RIOT_API_KEY = process.env.RIOT_API_KEY;
 const LOL_REGION = process.env.LOL_REGION || 'EUW1';
@@ -8,30 +9,6 @@ const LOL_ROUTING = process.env.LOL_ROUTING || 'EUROPE';
 
 const PLATFORM_BASE = `https://${LOL_REGION.toLowerCase()}.api.riotgames.com`;
 const ROUTING_BASE = `https://${LOL_ROUTING.toLowerCase()}.api.riotgames.com`;
-
-const QUEUE_NAMES = {
-    420: 'Ranked Solo/Duo',
-    440: 'Ranked Flex',
-    400: 'Normal Draft',
-    430: 'Normal Blind',
-    450: 'ARAM',
-    1700: 'Arena',
-    1900: 'URF',
-    900: 'URF',
-};
-
-const RANK_ICONS = {
-    IRON: '⬛',
-    BRONZE: '🟫',
-    SILVER: '⬜',
-    GOLD: '🟨',
-    PLATINUM: '🟦',
-    EMERALD: '🟩',
-    DIAMOND: '💎',
-    MASTER: '🔮',
-    GRANDMASTER: '🔱',
-    CHALLENGER: '👑',
-};
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -78,68 +55,6 @@ async function getRecentMatches(puuid, count = 5) {
 async function getMatchDetails(matchId) {
     const url = `${ROUTING_BASE}/lol/match/v5/matches/${matchId}`;
     return await riotGet(url);
-}
-
-function buildMatchEmbed(player, participant, match, rankInfo) {
-    const win = participant.win;
-    const champion = participant.championName;
-    const kills = participant.kills;
-    const deaths = participant.deaths;
-    const assists = participant.assists;
-    const kda = deaths === 0 ? 'Perfect' : ((kills + assists) / deaths).toFixed(2);
-    const cs = participant.totalMinionsKilled + participant.neutralMinionsKilled;
-    const gameDuration = Math.floor(match.info.gameDuration / 60);
-    const csPerMin = (cs / gameDuration).toFixed(1);
-    const queueName = QUEUE_NAMES[match.info.queueId] || `Mode ${match.info.queueId}`;
-
-    const damageToChampions = participant.totalDamageDealtToChampions.toLocaleString('fr-FR');
-    const visionScore = participant.visionScore;
-    const goldEarned = participant.goldEarned.toLocaleString('fr-FR');
-
-    let multikillText = '';
-    if (participant.pentaKills > 0) multikillText = '⚔️ **PENTA KILL !** ';
-    else if (participant.quadraKills > 0) multikillText = '⚔️ **QUADRA KILL** ';
-    else if (participant.tripleKills > 0) multikillText = '✨ Triple Kill ';
-    else if (participant.doubleKills > 0) multikillText = '🎯 Double Kill ';
-
-    let rankText = 'Non classé';
-    if (rankInfo?.solo) {
-        const r = rankInfo.solo;
-        const icon = RANK_ICONS[r.tier] || '❓';
-        const winrate = ((r.wins / (r.wins + r.losses)) * 100).toFixed(0);
-        rankText = `${icon} ${r.tier} ${r.rank} — ${r.leaguePoints} LP\n${r.wins}V/${r.losses}D (${winrate}%)`;
-    }
-
-    const killParticipation = (() => {
-        const teamKills = match.info.participants
-            .filter(p => p.teamId === participant.teamId)
-            .reduce((sum, p) => sum + p.kills, 0);
-        if (teamKills === 0) return '0%';
-        return `${Math.round(((kills + assists) / teamKills) * 100)}%`;
-    })();
-
-    const embed = new EmbedBuilder()
-        .setColor(win ? '#2ecc71' : '#e74c3c')
-        .setTitle(`${win ? '🏆 VICTOIRE' : '💀 DÉFAITE'} — ${champion}`)
-        .setDescription(
-            `**${player.displayName}** vient de finir une partie !\n` +
-            `${multikillText}` +
-            `**${queueName}** • ${gameDuration} min`
-        )
-        .addFields(
-            { name: '📊 KDA', value: `**${kills}** / **${deaths}** / **${assists}**\nRatio: **${kda}**`, inline: true },
-            { name: '🌾 CS', value: `**${cs}** (${csPerMin}/min)`, inline: true },
-            { name: '👁️ Vision', value: `Score: **${visionScore}**`, inline: true },
-            { name: '⚔️ Dégâts', value: `**${damageToChampions}**`, inline: true },
-            { name: '💰 Or', value: `**${goldEarned}**`, inline: true },
-            { name: '🎯 Participation', value: `**${killParticipation}**`, inline: true },
-            { name: '🏅 Rang actuel', value: rankText, inline: false }
-        )
-        .setThumbnail(`https://ddragon.leagueoflegends.com/cdn/14.24.1/img/champion/${champion}.png`)
-        .setFooter({ text: `Match ID: ${match.metadata.matchId}` })
-        .setTimestamp(match.info.gameEndTimestamp);
-
-    return embed;
 }
 
 async function checkLolGames(client) {
@@ -196,14 +111,20 @@ async function checkLolGames(client) {
 
                 const rankInfo = await getRankedInfo(player.puuid);
 
-                const embed = buildMatchEmbed(
-                    { displayName: player.display_name },
-                    participant,
-                    matchData,
-                    rankInfo
-                );
+                try {
+                    const imageBuffer = await generateMatchCard(
+                        { displayName: player.display_name },
+                        participant,
+                        matchData,
+                        rankInfo
+                    );
 
-                await channel.send({ embeds: [embed] });
+                    const attachment = new AttachmentBuilder(imageBuffer, { name: 'match.png' });
+                    await channel.send({ files: [attachment] });
+                } catch (canvasErr) {
+                    console.error('❌ Erreur génération image:', canvasErr.message);
+                }
+
                 await updateLolLastMatchId(player.puuid, matchId);
                 await wait(2000);
             }
