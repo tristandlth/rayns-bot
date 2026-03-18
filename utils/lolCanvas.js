@@ -26,11 +26,17 @@ const QUEUE_NAMES = {
 const ARCANE_CHAMPIONS = {
     'Jinx': path.join(__dirname, '../img/arcane/jinx.jpg'),
     'Vi': path.join(__dirname, '../img/arcane/vi.jpg'),
-    'Jayce': path.join(__dirname, '../img/arcane/jayce.jpg'),
-    'Caitlyn': path.join(__dirname, '../img/arcane/caitlyn.jpg'),
     'Viktor': path.join(__dirname, '../img/arcane/viktor.jpg'),
     'Ekko': path.join(__dirname, '../img/arcane/ekko.jpg'),
-    'Singed': path.join(__dirname, '../img/arcane/singed.jpg'),
+    'Singed': path.join(__dirname, '../img/arcane/singed.webp'),
+};
+
+const ARCANE_SPLASH = {
+    'Jinx': path.join(__dirname, '../img/arcane-splash/jinx.jpg'),
+    'Vi': path.join(__dirname, '../img/arcane-splash/vi.jpg'),
+    'Viktor': path.join(__dirname, '../img/arcane-splash/viktor.jpg'),
+    'Ekko': path.join(__dirname, '../img/arcane-splash/ekko.jpg'),
+    'Singed': path.join(__dirname, '../img/arcane-splash/singed.webp'),
 };
 
 let ddragonVersion = null;
@@ -109,9 +115,9 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     else if (participant.tripleKills > 0) multikill = 'Triple Kill';
     else if (participant.doubleKills > 0) multikill = 'Double Kill';
 
-    // Fond splash art
-    const splashUrl = `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion}_0.jpg`;
-    const splash = await fetchImage(splashUrl);
+    // Fond splash art (Arcane si dispo, sinon ddragon)
+    const splashSource = ARCANE_SPLASH[champion] || `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion}_0.jpg`;
+    const splash = await fetchImage(splashSource);
     if (splash) {
         const scale = Math.max(WIDTH / splash.width, HEIGHT / splash.height);
         const sw = splash.width * scale;
