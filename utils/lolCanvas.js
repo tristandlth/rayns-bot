@@ -315,8 +315,8 @@ async function generateMatchCard(player, participant, match, rankInfo) {
 
     ctx.fillStyle = '#555555';
     ctx.font = '11px sans-serif';
-    ctx.fillText('Equipe 1', 25, compoY - 5);
-    ctx.fillText('Equipe 2', 25 + 5 * (champSize + 4) + 30, compoY - 5);
+    ctx.fillText('Blue Side', 25, compoY - 5);
+    ctx.fillText('Red Side', 25 + 5 * (champSize + 4) + 30, compoY - 5);
 
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 13px sans-serif';
