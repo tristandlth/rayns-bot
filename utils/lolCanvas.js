@@ -23,20 +23,22 @@ const QUEUE_NAMES = {
     440: 'Ranked Flex',
 };
 
-const ARCANE_CHAMPIONS = {
-    'Jinx': path.join(__dirname, '../img/arcane/jinx.jpg'),
-    'Vi': path.join(__dirname, '../img/arcane/vi.jpg'),
-    'Viktor': path.join(__dirname, '../img/arcane/viktor.jpg'),
-    'Ekko': path.join(__dirname, '../img/arcane/ekko.jpg'),
-    'Singed': path.join(__dirname, '../img/arcane/singed.webp'),
+const CHAMPIONS = {
+    'Jinx': path.join(__dirname, '../img/icons/jinx.jpg'),
+    'Vi': path.join(__dirname, '../img/icons/vi.jpg'),
+    'Viktor': path.join(__dirname, '../img/icons/viktor.jpg'),
+    'Ekko': path.join(__dirname, '../img/icons/ekko.jpg'),
+    'Singed': path.join(__dirname, '../img/icons/singed.webp'),
+    'Velkoz': path.join(__dirname, '../img/icons/velkoz.webp'),
 };
 
-const ARCANE_SPLASH = {
-    'Jinx': path.join(__dirname, '../img/arcane-splash/jinx.jpg'),
-    'Vi': path.join(__dirname, '../img/arcane-splash/vi.jpg'),
-    'Viktor': path.join(__dirname, '../img/arcane-splash/viktor.jpg'),
-    'Ekko': path.join(__dirname, '../img/arcane-splash/ekko.jpg'),
-    'Singed': path.join(__dirname, '../img/arcane-splash/singed.webp'),
+const SPLASH = {
+    'Jinx': path.join(__dirname, '../img/splash/jinx.webp'),
+    'Vi': path.join(__dirname, '../img/splash/vi.jpg'),
+    'Viktor': path.join(__dirname, '../img/splash/viktor.jpg'),
+    'Ekko': path.join(__dirname, '../img/splash/ekko.jpg'),
+    'Singed': path.join(__dirname, '../img/splash/singed.webp'),
+    'Velkoz': path.join(__dirname, '../img/splash/velkoz.webp'),
 };
 
 let ddragonVersion = null;
@@ -115,8 +117,8 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     else if (participant.tripleKills > 0) multikill = 'Triple Kill';
     else if (participant.doubleKills > 0) multikill = 'Double Kill';
 
-    // Fond splash art (Arcane si dispo, sinon ddragon)
-    const splashSource = ARCANE_SPLASH[champion] || `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion}_0.jpg`;
+    // Fond splash art
+    const splashSource = SPLASH[champion] || `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion}_0.jpg`;
     const splash = await fetchImage(splashSource);
     if (splash) {
         const scale = Math.max(WIDTH / splash.width, HEIGHT / splash.height);
@@ -138,8 +140,8 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.fillRect(0, 0, 5, HEIGHT);
 
     // Icône champion
-    const arcaneSource = ARCANE_CHAMPIONS[champion];
-    const champIconUrl = arcaneSource || `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${champion}.png`;
+    const champSource = CHAMPIONS[champion];
+    const champIconUrl = champSource || `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${champion}.png`;
     const champIcon = await fetchImage(champIconUrl);
     if (champIcon) {
         ctx.save();
@@ -163,6 +165,11 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.font = 'bold 12px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(`Niv. ${champLevel}`, 70, 126);
+
+    // Nom du champion sous le badge
+    ctx.fillStyle = '#aaaaaa';
+    ctx.font = '12px sans-serif';
+    ctx.fillText(champion, 70, 148);
     ctx.textAlign = 'left';
 
     // Résultat
@@ -170,14 +177,15 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.font = 'bold 26px sans-serif';
     ctx.fillText(win ? 'VICTOIRE' : 'DEFAITE', 140, 58);
 
-    // Nom champion en blanc
+    // Pseudo du joueur en blanc
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 22px sans-serif';
-    ctx.fillText(champion, 140, 90);
+    ctx.fillText(player.displayName, 140, 90);
 
+    // Queue et durée
     ctx.fillStyle = '#aaaaaa';
     ctx.font = '14px sans-serif';
-    ctx.fillText(`${player.displayName}  |  ${queueName}  |  ${gameDuration} min`, 140, 115);
+    ctx.fillText(`${queueName}  |  ${gameDuration} min`, 140, 115);
 
     if (multikill) {
         ctx.fillStyle = '#f39c12';
