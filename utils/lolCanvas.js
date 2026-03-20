@@ -24,21 +24,21 @@ const QUEUE_NAMES = {
 };
 
 const CHAMPIONS = {
-    'Jinx': path.join(__dirname, '../img/icons/jinx.jpg'),
+    'Jinx': path.join(__dirname, '../img/icons/jinx.png'),
     'Vi': path.join(__dirname, '../img/icons/vi.jpg'),
     'Viktor': path.join(__dirname, '../img/icons/viktor.jpg'),
     'Ekko': path.join(__dirname, '../img/icons/ekko.jpg'),
-    'Singed': path.join(__dirname, '../img/icons/singed.webp'),
-    'Velkoz': path.join(__dirname, '../img/icons/velkoz.webp'),
+    'Singed': path.join(__dirname, '../img/icons/singed.jpg'),
+    'Velkoz': path.join(__dirname, '../img/icons/velkoz.jpg'),
 };
 
 const SPLASH = {
-    'Jinx': path.join(__dirname, '../img/splash/jinx.webp'),
+    'Jinx': path.join(__dirname, '../img/splash/jinx.jpg'),
     'Vi': path.join(__dirname, '../img/splash/vi.jpg'),
     'Viktor': path.join(__dirname, '../img/splash/viktor.jpg'),
     'Ekko': path.join(__dirname, '../img/splash/ekko.jpg'),
-    'Singed': path.join(__dirname, '../img/splash/singed.webp'),
-    'Velkoz': path.join(__dirname, '../img/splash/velkoz.webp'),
+    'Singed': path.join(__dirname, '../img/splash/singed.jpg'),
+    'Velkoz': path.join(__dirname, '../img/splash/velkoz.jpg'),
 };
 
 let ddragonVersion = null;
