@@ -67,7 +67,8 @@ async function fetchImage(source) {
         }
         imageCache.set(source, img);
         return img;
-    } catch {
+    } catch (err) {
+        console.error(`❌ fetchImage erreur pour: ${source}`, err.message);
         return null;
     }
 }
