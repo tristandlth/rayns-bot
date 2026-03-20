@@ -23,8 +23,8 @@ const QUEUE_NAMES = {
     440: 'Ranked Flex',
 };
 
-const CHAMPIONS = {
-    'Jinx': path.join(__dirname, '../img/icons/jinx.png'),
+const ICONS = {
+    'Jinx': path.join(__dirname, '../img/icons/jinx.jpg'),
     'Vi': path.join(__dirname, '../img/icons/vi.jpg'),
     'Viktor': path.join(__dirname, '../img/icons/viktor.jpg'),
     'Ekko': path.join(__dirname, '../img/icons/ekko.jpg'),
@@ -33,7 +33,7 @@ const CHAMPIONS = {
 };
 
 const SPLASH = {
-    'Jinx': path.join(__dirname, '../img/splash/jinx.jpg'),
+    'Jinx': path.join(__dirname, '../img/splash/jinx.png'),
     'Vi': path.join(__dirname, '../img/splash/vi.jpg'),
     'Viktor': path.join(__dirname, '../img/splash/viktor.jpg'),
     'Ekko': path.join(__dirname, '../img/splash/ekko.jpg'),
@@ -141,7 +141,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.fillRect(0, 0, 5, HEIGHT);
 
     // Icône champion
-    const champSource = CHAMPIONS[champion];
+    const champSource = ICONS[champion];
     const champIconUrl = champSource || `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${champion}.png`;
     const champIcon = await fetchImage(champIconUrl);
     if (champIcon) {
