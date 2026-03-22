@@ -85,10 +85,8 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 function kdaColor(ratio) {
-    if (ratio === null) return '#00e5ff';
-    if (ratio >= 4) return '#2ecc71';
-    if (ratio >= 2.5) return '#f39c12';
-    if (ratio >= 1) return '#ffffff';
+    if (ratio === null) return '#2ecc71';
+    if (ratio >= 1) return '#2ecc71';
     return '#e74c3c';
 }
 
@@ -248,7 +246,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.stroke();
 
     // Blocs stats améliorés
-    const statAccentColors = ['#00e5ff', '#a8e063', '#b39ddb', '#ff8a65', '#f06292'];
+    const statAccentColors = ['#2ecc71', '#2ecc71', '#2ecc71', '#2ecc71', '#2ecc71'];
     const stats = [
         { label: 'KDA', value: `${kills} / ${deaths} / ${assists}`, sub: `Ratio ${kda}`, colored: true },
         { label: 'CS', value: cs.toString(), sub: `${csPerMin}/min`, colored: false },
