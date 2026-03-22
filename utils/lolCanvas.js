@@ -23,21 +23,21 @@ const QUEUE_NAMES = {
     440: 'Ranked Flex',
 };
 
-const ICONS = {
+const CHAMPIONS = {
     'Jinx': path.join(__dirname, '../img/icons/jinx.jpg'),
     'Vi': path.join(__dirname, '../img/icons/vi.jpg'),
     'Viktor': path.join(__dirname, '../img/icons/viktor.jpg'),
     'Ekko': path.join(__dirname, '../img/icons/ekko.jpg'),
-    'Singed': path.join(__dirname, '../img/icons/singed.jpg'),
+    'Singed': path.join(__dirname, '../img/icons/singed.webp'),
     'Velkoz': path.join(__dirname, '../img/icons/velkoz.jpg'),
 };
 
 const SPLASH = {
-    'Jinx': path.join(__dirname, '../img/splash/jinx.png'),
+    'Jinx': path.join(__dirname, '../img/splash/jinx.webp'),
     'Vi': path.join(__dirname, '../img/splash/vi.jpg'),
     'Viktor': path.join(__dirname, '../img/splash/viktor.jpg'),
     'Ekko': path.join(__dirname, '../img/splash/ekko.jpg'),
-    'Singed': path.join(__dirname, '../img/splash/singed.jpg'),
+    'Singed': path.join(__dirname, '../img/splash/singed.webp'),
     'Velkoz': path.join(__dirname, '../img/splash/velkoz.jpg'),
 };
 
@@ -87,6 +87,14 @@ function roundRect(ctx, x, y, w, h, r) {
     ctx.closePath();
 }
 
+function kdaColor(ratio) {
+    if (ratio === null) return '#00e5ff';
+    if (ratio >= 4) return '#2ecc71';
+    if (ratio >= 2.5) return '#f39c12';
+    if (ratio >= 1) return '#ffffff';
+    return '#e74c3c';
+}
+
 async function generateMatchCard(player, participant, match, rankInfo) {
     const version = await getDdragonVersion();
     const canvas = createCanvas(WIDTH, HEIGHT);
@@ -97,7 +105,8 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     const kills = participant.kills;
     const deaths = participant.deaths;
     const assists = participant.assists;
-    const kda = deaths === 0 ? 'Perfect' : ((kills + assists) / deaths).toFixed(2);
+    const kdaRatio = deaths === 0 ? null : (kills + assists) / deaths;
+    const kda = kdaRatio === null ? 'Perfect' : kdaRatio.toFixed(2);
     const cs = participant.totalMinionsKilled + participant.neutralMinionsKilled;
     const gameDuration = Math.floor(match.info.gameDuration / 60);
     const csPerMin = (cs / gameDuration).toFixed(1);
@@ -141,7 +150,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.fillRect(0, 0, 5, HEIGHT);
 
     // Icône champion
-    const champSource = ICONS[champion];
+    const champSource = CHAMPIONS[champion];
     const champIconUrl = champSource || `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${champion}.png`;
     const champIcon = await fetchImage(champIconUrl);
     if (champIcon) {
@@ -241,59 +250,142 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.lineTo(620, 228);
     ctx.stroke();
 
-    // Blocs stats
+    // Blocs stats améliorés
+    const statAccentColors = ['#00e5ff', '#a8e063', '#b39ddb', '#ff8a65', '#f06292'];
     const stats = [
-        { label: 'KDA', value: `${kills} / ${deaths} / ${assists}`, sub: `Ratio ${kda}` },
-        { label: 'CS', value: cs.toString(), sub: `${csPerMin}/min` },
-        { label: 'Vision', value: visionScore.toString(), sub: `${wardsPlaced} wards` },
-        { label: 'Degats', value: `${damage}k`, sub: 'aux champions' },
-        { label: 'Kill Part.', value: kp, sub: '' },
+        { label: 'KDA', value: `${kills} / ${deaths} / ${assists}`, sub: `Ratio ${kda}`, colored: true },
+        { label: 'CS', value: cs.toString(), sub: `${csPerMin}/min`, colored: false },
+        { label: 'Vision', value: visionScore.toString(), sub: `${wardsPlaced} wards`, colored: false },
+        { label: 'Degats', value: `${damage}k`, sub: 'aux champions', colored: false },
+        { label: 'Kill Part.', value: kp, sub: '', colored: false },
     ];
 
-    const statY = 245;
+    const statY = 240;
     const statW = 108;
+    const statH = 95;
     const statGap = 10;
     const statStartX = 25;
 
     stats.forEach((stat, i) => {
         const x = statStartX + i * (statW + statGap);
-        roundRect(ctx, x, statY, statW, 90, 8);
-        ctx.fillStyle = 'rgba(255,255,255,0.07)';
+        const accent = statAccentColors[i];
+
+        // Fond du bloc
+        roundRect(ctx, x, statY, statW, statH, 8);
+        ctx.fillStyle = 'rgba(255,255,255,0.06)';
         ctx.fill();
 
-        ctx.fillStyle = '#888888';
-        ctx.font = '12px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(stat.label, x + statW / 2, statY + 20);
+        // Ligne colorée en haut
+        roundRect(ctx, x, statY, statW, 3, 2);
+        ctx.fillStyle = accent;
+        ctx.fill();
 
-        ctx.fillStyle = '#ffffff';
-        ctx.font = `bold ${stat.value.length > 9 ? '14px' : '18px'} sans-serif`;
+        // Label
+        ctx.fillStyle = accent;
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(stat.label, x + statW / 2, statY + 18);
+
+        // Valeur principale
+        if (stat.colored) {
+            ctx.fillStyle = kdaColor(kdaRatio);
+        } else {
+            ctx.fillStyle = '#ffffff';
+        }
+        ctx.font = `bold ${stat.value.length > 9 ? '13px' : '18px'} sans-serif`;
         ctx.fillText(stat.value, x + statW / 2, statY + 56);
 
+        // Sous-valeur
         if (stat.sub) {
-            ctx.fillStyle = '#888888';
+            if (stat.colored) {
+                ctx.fillStyle = kdaColor(kdaRatio);
+                ctx.globalAlpha = 0.8;
+            } else {
+                ctx.fillStyle = '#777777';
+            }
             ctx.font = '11px sans-serif';
-            ctx.fillText(stat.sub, x + statW / 2, statY + 74);
+            ctx.fillText(stat.sub, x + statW / 2, statY + 76);
+            ctx.globalAlpha = 1;
         }
     });
 
     ctx.textAlign = 'left';
 
-    // Items (2 rangées de 3)
+    // Compos 5v5 avec KDA sous chaque champion
+    const team1 = match.info.participants.filter(p => p.teamId === 100);
+    const team2 = match.info.participants.filter(p => p.teamId === 200);
+    const champSize = 32;
+    const compoY = HEIGHT - champSize - 30;
+
+    ctx.fillStyle = '#555555';
+    ctx.font = '11px sans-serif';
+    ctx.fillText('Blue Side', 25, compoY - 5);
+
+    const team2StartX = 25 + 5 * (champSize + 4) + 30;
+    ctx.fillText('Red Side', team2StartX, compoY - 5);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('VS', 25 + 5 * (champSize + 4) + 14, compoY + 20);
+    ctx.textAlign = 'left';
+
+    for (const [teamIndex, team] of [team1, team2].entries()) {
+        const offsetX = teamIndex === 0 ? 25 : team2StartX;
+        for (let i = 0; i < team.length; i++) {
+            const p = team[i];
+            const x = offsetX + i * (champSize + 4);
+            const isTracked = p.puuid === participant.puuid;
+            const iconUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${p.championName}.png`;
+            const icon = await fetchImage(iconUrl);
+
+            // Icône
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(x + champSize / 2, compoY + champSize / 2, champSize / 2, 0, Math.PI * 2);
+            ctx.clip();
+            if (icon) {
+                ctx.drawImage(icon, x, compoY, champSize, champSize);
+            } else {
+                ctx.fillStyle = '#333333';
+                ctx.fillRect(x, compoY, champSize, champSize);
+            }
+            ctx.restore();
+
+            // Bordure
+            ctx.strokeStyle = isTracked ? '#c89b3c' : 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = isTracked ? 2.5 : 1;
+            ctx.beginPath();
+            ctx.arc(x + champSize / 2, compoY + champSize / 2, champSize / 2, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // KDA sous l'icône
+            const pKda = `${p.kills}/${p.deaths}/${p.assists}`;
+            const pRatio = p.deaths === 0 ? null : (p.kills + p.assists) / p.deaths;
+            ctx.fillStyle = isTracked ? '#c89b3c' : kdaColor(pRatio);
+            ctx.font = `${isTracked ? 'bold ' : ''}9px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText(pKda, x + champSize / 2, compoY + champSize + 12);
+        }
+    }
+
+    ctx.textAlign = 'left';
+
+    // Items repositionnés à droite des équipes
     const itemIds = [
         participant.item0, participant.item1, participant.item2,
         participant.item3, participant.item4, participant.item5,
     ].filter(id => id > 0);
 
-    const itemSize = 36;
-    const itemStartX = 648;
-    const itemStartY = 245;
+    const itemSize = 30;
+    const itemStartX = team2StartX + 5 * (champSize + 4) + 15;
+    const itemStartY = compoY;
 
     for (let i = 0; i < itemIds.length; i++) {
         const col = i % 3;
         const row = Math.floor(i / 3);
-        const x = itemStartX + col * (itemSize + 4);
-        const y = itemStartY + row * (itemSize + 4);
+        const x = itemStartX + col * (itemSize + 3);
+        const y = itemStartY + row * (itemSize + 3);
         const imgUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemIds[i]}.png`;
         const img = await fetchImage(imgUrl);
         roundRect(ctx, x, y, itemSize, itemSize, 4);
@@ -312,59 +404,13 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     if (participant.item6 > 0) {
         const trinketUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${participant.item6}.png`;
         const trinket = await fetchImage(trinketUrl);
-        const tx = itemStartX + 3 * (itemSize + 4) + 6;
+        const tx = itemStartX + 3 * (itemSize + 3) + 6;
         roundRect(ctx, tx, itemStartY, itemSize, itemSize, 4);
         if (trinket) {
             ctx.save();
             ctx.clip();
             ctx.drawImage(trinket, tx, itemStartY, itemSize, itemSize);
             ctx.restore();
-        }
-    }
-
-    // Compos 5v5
-    const team1 = match.info.participants.filter(p => p.teamId === 100);
-    const team2 = match.info.participants.filter(p => p.teamId === 200);
-    const champSize = 32;
-    const compoY = HEIGHT - champSize - 15;
-
-    ctx.fillStyle = '#555555';
-    ctx.font = '11px sans-serif';
-    ctx.fillText('Blue Side', 25, compoY - 5);
-    ctx.fillText('Red Side', 25 + 5 * (champSize + 4) + 30, compoY - 5);
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('VS', 25 + 5 * (champSize + 4) + 14, compoY + 20);
-    ctx.textAlign = 'left';
-
-    for (const [teamIndex, team] of [team1, team2].entries()) {
-        const offsetX = teamIndex === 0 ? 25 : 25 + 5 * (champSize + 4) + 30;
-        for (let i = 0; i < team.length; i++) {
-            const p = team[i];
-            const x = offsetX + i * (champSize + 4);
-            const isTracked = p.puuid === participant.puuid;
-            const iconUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${p.championName}.png`;
-            const icon = await fetchImage(iconUrl);
-
-            ctx.save();
-            ctx.beginPath();
-            ctx.arc(x + champSize / 2, compoY + champSize / 2, champSize / 2, 0, Math.PI * 2);
-            ctx.clip();
-            if (icon) {
-                ctx.drawImage(icon, x, compoY, champSize, champSize);
-            } else {
-                ctx.fillStyle = '#333333';
-                ctx.fillRect(x, compoY, champSize, champSize);
-            }
-            ctx.restore();
-
-            ctx.strokeStyle = isTracked ? '#c89b3c' : 'rgba(255,255,255,0.2)';
-            ctx.lineWidth = isTracked ? 2.5 : 1;
-            ctx.beginPath();
-            ctx.arc(x + champSize / 2, compoY + champSize / 2, champSize / 2, 0, Math.PI * 2);
-            ctx.stroke();
         }
     }
 
