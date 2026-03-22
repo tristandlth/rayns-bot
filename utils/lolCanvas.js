@@ -246,7 +246,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.stroke();
 
     // Blocs stats améliorés
-    const statAccentColors = ['#2ecc71', '#2ecc71', '#2ecc71', '#2ecc71', '#2ecc71'];
+    const statAccentColors = ['#00e5ff', '#a8e063', '#b39ddb', '#ff8a65', '#f06292'];
     const stats = [
         { label: 'KDA', value: `${kills} / ${deaths} / ${assists}`, sub: `Ratio ${kda}`, colored: true },
         { label: 'CS', value: cs.toString(), sub: `${csPerMin}/min`, colored: false },
