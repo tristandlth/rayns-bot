@@ -86,18 +86,84 @@ function roundRect(ctx, x, y, w, h, r) {
 
 function kdaColor(ratio) {
     if (ratio === null) return '#2ecc71';
-    if (ratio >= 1) return '#2ecc71';
-    return '#e74c3c';
+    return ratio >= 1 ? '#2ecc71' : '#e74c3c';
 }
 
-// Couleur KDA selon rôle : support = (kills+assists)/deaths, autres = kills/deaths
 function playerKdaColor(p) {
     const isSupport = p.teamPosition === 'UTILITY';
     if (p.deaths === 0) return '#2ecc71';
-    const score = isSupport
-        ? (p.kills + p.assists) / p.deaths
-        : p.kills / p.deaths;
+    const score = isSupport ? (p.kills + p.assists) / p.deaths : p.kills / p.deaths;
     return score >= 1 ? '#2ecc71' : '#e74c3c';
+}
+
+// Calcul de la note de performance
+function calculateGrade(participant, match) {
+    const role = participant.teamPosition || 'NONE';
+    const gameDuration = match.info.gameDuration / 60;
+
+    // Tous les joueurs du même rôle dans la partie (pour comparer)
+    const sameRole = match.info.participants.filter(
+        p => p.teamPosition === role && p.puuid !== participant.puuid
+    );
+    const reference = sameRole.length >= 2 ? sameRole : match.info.participants.filter(p => p.puuid !== participant.puuid);
+
+    const avg = (arr, fn) => arr.reduce((s, p) => s + fn(p), 0) / arr.length;
+
+    // Métriques du joueur
+    const myKda = participant.deaths === 0 ? (participant.kills + participant.assists) : (participant.kills + participant.assists) / participant.deaths;
+    const myCs = (participant.totalMinionsKilled + participant.neutralMinionsKilled) / gameDuration;
+    const myVision = participant.visionScore / gameDuration;
+    const teamKills = match.info.participants.filter(p => p.teamId === participant.teamId).reduce((s, p) => s + p.kills, 0);
+    const myKp = teamKills === 0 ? 0 : (participant.kills + participant.assists) / teamKills;
+    const myDamage = participant.totalDamageDealtToChampions / gameDuration;
+
+    // Moyennes de référence
+    const avgKda = avg(reference, p => p.deaths === 0 ? (p.kills + p.assists) : (p.kills + p.assists) / p.deaths);
+    const avgCs = avg(reference, p => (p.totalMinionsKilled + p.neutralMinionsKilled) / gameDuration);
+    const avgVision = avg(reference, p => p.visionScore / gameDuration);
+    const avgDamage = avg(reference, p => p.totalDamageDealtToChampions / gameDuration);
+
+    // Score pondéré selon le rôle
+    let score = 0;
+    if (role === 'UTILITY') {
+        // Support : vision et KDA comptent plus, CS moins
+        score += (myKda / Math.max(avgKda, 0.1)) * 30;
+        score += (myVision / Math.max(avgVision, 0.1)) * 35;
+        score += myKp * 25;
+        score += (myDamage / Math.max(avgDamage, 1)) * 10;
+    } else if (role === 'JUNGLE') {
+        score += (myKda / Math.max(avgKda, 0.1)) * 30;
+        score += myKp * 30;
+        score += (myCs / Math.max(avgCs, 0.1)) * 20;
+        score += (myVision / Math.max(avgVision, 0.1)) * 20;
+    } else {
+        // Top, Mid, ADC
+        score += (myKda / Math.max(avgKda, 0.1)) * 30;
+        score += (myCs / Math.max(avgCs, 0.1)) * 30;
+        score += (myDamage / Math.max(avgDamage, 1)) * 25;
+        score += myKp * 15;
+    }
+
+    // Bonus victoire
+    if (participant.win === true || participant.win === 'Win') score *= 1.1;
+
+    if (score >= 1.6) return 'S+';
+    if (score >= 1.35) return 'S';
+    if (score >= 1.15) return 'S-';
+    if (score >= 1.0) return 'A+';
+    if (score >= 0.85) return 'A';
+    if (score >= 0.7) return 'B+';
+    if (score >= 0.55) return 'B';
+    if (score >= 0.4) return 'C';
+    return 'D';
+}
+
+function gradeColor(grade) {
+    if (grade.startsWith('S')) return '#f39c12';
+    if (grade.startsWith('A')) return '#2ecc71';
+    if (grade.startsWith('B')) return '#3498db';
+    if (grade === 'C') return '#aaaaaa';
+    return '#e74c3c';
 }
 
 async function generateMatchCard(player, participant, match, rankInfo) {
@@ -126,6 +192,8 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     const teamDeaths = teamParticipants.reduce((sum, p) => sum + p.deaths, 0);
     const teamAssists = teamParticipants.reduce((sum, p) => sum + p.assists, 0);
     const kp = teamKills === 0 ? '0%' : `${Math.round(((kills + assists) / teamKills) * 100)}%`;
+
+    const grade = calculateGrade(participant, match);
 
     let multikill = '';
     if (participant.pentaKills > 0) multikill = 'PENTA KILL';
@@ -209,6 +277,17 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         ctx.fillText(multikill, 140, 140);
     }
 
+    // Note de performance
+    const gColor = gradeColor(grade);
+    ctx.font = `bold 28px sans-serif`;
+    ctx.fillStyle = gColor;
+    ctx.textAlign = 'right';
+    ctx.fillText(grade, 620, 58);
+    ctx.fillStyle = '#666666';
+    ctx.font = '11px sans-serif';
+    ctx.fillText('Note', 620, 72);
+    ctx.textAlign = 'left';
+
     // Logo et infos de rang
     if (rankInfo?.solo) {
         const r = rankInfo.solo;
@@ -256,7 +335,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.lineTo(620, 228);
     ctx.stroke();
 
-    // Blocs stats — design propre, 1 couleur accent
+    // Blocs stats
     const ACCENT = '#2ecc71';
     const stats = [
         { label: 'KDA', value: `${kills} / ${deaths} / ${assists}`, sub: `Ratio ${kda}`, colored: true },
@@ -275,34 +354,28 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     stats.forEach((stat, i) => {
         const x = statStartX + i * (statW + statGap);
 
-        // Fond du bloc
         roundRect(ctx, x, statY, statW, statH, 8);
         ctx.fillStyle = 'rgba(255,255,255,0.05)';
         ctx.fill();
 
-        // Bordure subtile
         roundRect(ctx, x, statY, statW, statH, 8);
         ctx.strokeStyle = 'rgba(255,255,255,0.08)';
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // Ligne accent en haut
         roundRect(ctx, x, statY, statW, 3, 2);
         ctx.fillStyle = stat.colored ? kdaColor(kdaRatio) : ACCENT;
         ctx.fill();
 
-        // Label
         ctx.fillStyle = '#888888';
         ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(stat.label, x + statW / 2, statY + 20);
 
-        // Valeur principale
         ctx.fillStyle = stat.colored ? kdaColor(kdaRatio) : '#ffffff';
         ctx.font = `bold ${stat.value.length > 9 ? '13px' : '19px'} sans-serif`;
         ctx.fillText(stat.value, x + statW / 2, statY + 58);
 
-        // Sous-valeur
         if (stat.sub) {
             ctx.fillStyle = '#666666';
             ctx.font = '11px sans-serif';
@@ -312,23 +385,27 @@ async function generateMatchCard(player, participant, match, rankInfo) {
 
     ctx.textAlign = 'left';
 
-    // Compos 5v5 avec KDA et KDA global team
+    // Compos 5v5
     const team1 = match.info.participants.filter(p => p.teamId === 100);
     const team2 = match.info.participants.filter(p => p.teamId === 200);
     const champSize = 32;
     const compoY = HEIGHT - champSize - 30;
+    const team2StartX = 25 + 5 * (champSize + 4) + 30;
 
-    // KDA global de la team du joueur suivi
-    const teamKdaStr = `Team : ${teamKills} / ${teamDeaths} / ${teamAssists}`;
-    ctx.fillStyle = '#666666';
+    // KDA team du bon côté
+    const isBlue = participant.teamId === 100;
+    const teamKdaStr = `${teamKills} / ${teamDeaths} / ${teamAssists}`;
+    ctx.fillStyle = '#ffffff';
     ctx.font = '10px sans-serif';
-    ctx.fillText(teamKdaStr, 25, HEIGHT - 5);
+    if (isBlue) {
+        ctx.fillText(teamKdaStr, 25, HEIGHT - 5);
+    } else {
+        ctx.fillText(teamKdaStr, team2StartX, HEIGHT - 5);
+    }
 
     ctx.fillStyle = '#555555';
     ctx.font = '11px sans-serif';
     ctx.fillText('Blue Side', 25, compoY - 5);
-
-    const team2StartX = 25 + 5 * (champSize + 4) + 30;
     ctx.fillText('Red Side', team2StartX, compoY - 5);
 
     ctx.fillStyle = '#ffffff';
@@ -358,7 +435,8 @@ async function generateMatchCard(player, participant, match, rankInfo) {
             }
             ctx.restore();
 
-            ctx.strokeStyle = isTracked ? '#c89b3c' : 'rgba(255,255,255,0.2)';
+            // Bordure blanche pour le joueur suivi, semi-transparente pour les autres
+            ctx.strokeStyle = isTracked ? '#ffffff' : 'rgba(255,255,255,0.2)';
             ctx.lineWidth = isTracked ? 2.5 : 1;
             ctx.beginPath();
             ctx.arc(x + champSize / 2, compoY + champSize / 2, champSize / 2, 0, Math.PI * 2);
@@ -366,7 +444,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
 
             // KDA sous l'icône
             const pKda = `${p.kills}/${p.deaths}/${p.assists}`;
-            ctx.fillStyle = isTracked ? '#c89b3c' : playerKdaColor(p);
+            ctx.fillStyle = isTracked ? '#ffffff' : playerKdaColor(p);
             ctx.font = `${isTracked ? 'bold ' : ''}9px sans-serif`;
             ctx.textAlign = 'center';
             ctx.fillText(pKda, x + champSize / 2, compoY + champSize + 12);
