@@ -3,25 +3,15 @@ const axios = require('axios');
 const path = require('path');
 
 const WIDTH = 900;
-const HEIGHT = 420;
+const HEIGHT = 490;
 
 const RANK_COLORS = {
-    IRON: '#8a8a8a',
-    BRONZE: '#ad5f26',
-    SILVER: '#a0a8b0',
-    GOLD: '#c89b3c',
-    PLATINUM: '#4a8f8c',
-    EMERALD: '#32a868',
-    DIAMOND: '#576bce',
-    MASTER: '#9d4dc9',
-    GRANDMASTER: '#d6382e',
-    CHALLENGER: '#f4c874',
+    IRON: '#8a8a8a', BRONZE: '#ad5f26', SILVER: '#a0a8b0', GOLD: '#c89b3c',
+    PLATINUM: '#4a8f8c', EMERALD: '#32a868', DIAMOND: '#576bce',
+    MASTER: '#9d4dc9', GRANDMASTER: '#d6382e', CHALLENGER: '#f4c874',
 };
 
-const QUEUE_NAMES = {
-    420: 'Ranked Solo/Duo',
-    440: 'Ranked Flex',
-};
+const QUEUE_NAMES = { 420: 'Ranked Solo/Duo', 440: 'Ranked Flex' };
 
 const CHAMPIONS = {
     'Jinx': path.join(__dirname, '../img/icons/jinx.jpg'),
@@ -48,9 +38,7 @@ async function getDdragonVersion() {
         const res = await axios.get('https://ddragon.leagueoflegends.com/api/versions.json');
         ddragonVersion = res.data[0];
         return ddragonVersion;
-    } catch {
-        return '14.24.1';
-    }
+    } catch { return '14.24.1'; }
 }
 
 async function fetchImage(source) {
@@ -66,7 +54,7 @@ async function fetchImage(source) {
         imageCache.set(source, img);
         return img;
     } catch (err) {
-        console.error(`❌ fetchImage erreur pour: ${source}`, err.message);
+        console.error(`❌ fetchImage erreur: ${source}`, err.message);
         return null;
     }
 }
@@ -93,61 +81,43 @@ function kdaColor(ratio) {
 function playerKdaColor(p) {
     const isSupport = p.teamPosition === 'UTILITY';
     if (p.deaths === 0) return '#2ecc71';
-    const score = isSupport ? (p.kills + p.assists) / p.deaths : p.kills / p.deaths;
-    return score >= 1 ? '#2ecc71' : '#e74c3c';
+    const s = isSupport ? (p.kills + p.assists) / p.deaths : p.kills / p.deaths;
+    return s >= 1 ? '#2ecc71' : '#e74c3c';
 }
 
 function calculateScore(participant, match) {
     const role = participant.teamPosition || 'NONE';
-    const gameDuration = match.info.gameDuration / 60;
-
-    const sameRole = match.info.participants.filter(
-        p => p.teamPosition === role && p.puuid !== participant.puuid
-    );
-    const reference = sameRole.length >= 2 ? sameRole : match.info.participants.filter(p => p.puuid !== participant.puuid);
-
+    const dur = match.info.gameDuration / 60;
+    const sameRole = match.info.participants.filter(p => p.teamPosition === role && p.puuid !== participant.puuid);
+    const ref = sameRole.length >= 2 ? sameRole : match.info.participants.filter(p => p.puuid !== participant.puuid);
     const avg = (arr, fn) => arr.reduce((s, p) => s + fn(p), 0) / arr.length;
-    const ratio = (val, avgVal) => Math.min(val / Math.max(avgVal, 0.01), 2.0);
+    const ratio = (v, a) => Math.min(v / Math.max(a, 0.01), 2.0);
 
-    const myKda = participant.deaths === 0
-        ? (participant.kills + participant.assists) * 2
-        : (participant.kills + participant.assists) / participant.deaths;
-    const myCs = (participant.totalMinionsKilled + participant.neutralMinionsKilled) / gameDuration;
-    const myVision = participant.visionScore / gameDuration;
-    const myDamage = participant.totalDamageDealtToChampions / gameDuration;
-    const teamKills = match.info.participants
-        .filter(p => p.teamId === participant.teamId)
-        .reduce((s, p) => s + p.kills, 0);
+    const myKda = participant.deaths === 0 ? (participant.kills + participant.assists) * 2 : (participant.kills + participant.assists) / participant.deaths;
+    const myCs = (participant.totalMinionsKilled + participant.neutralMinionsKilled) / dur;
+    const myVision = participant.visionScore / dur;
+    const myDamage = participant.totalDamageDealtToChampions / dur;
+    const teamKills = match.info.participants.filter(p => p.teamId === participant.teamId).reduce((s, p) => s + p.kills, 0);
     const myKp = teamKills === 0 ? 0 : (participant.kills + participant.assists) / teamKills;
 
-    const avgKda = avg(reference, p => p.deaths === 0
-        ? (p.kills + p.assists) * 2
-        : (p.kills + p.assists) / p.deaths);
-    const avgCs = avg(reference, p => (p.totalMinionsKilled + p.neutralMinionsKilled) / gameDuration);
-    const avgVision = avg(reference, p => p.visionScore / gameDuration);
-    const avgDamage = avg(reference, p => p.totalDamageDealtToChampions / gameDuration);
-    const avgKp = avg(reference, p => {
+    const avgKda = avg(ref, p => p.deaths === 0 ? (p.kills + p.assists) * 2 : (p.kills + p.assists) / p.deaths);
+    const avgCs = avg(ref, p => (p.totalMinionsKilled + p.neutralMinionsKilled) / dur);
+    const avgVision = avg(ref, p => p.visionScore / dur);
+    const avgDamage = avg(ref, p => p.totalDamageDealtToChampions / dur);
+    const avgKp = avg(ref, p => {
         const tk = match.info.participants.filter(x => x.teamId === p.teamId).reduce((s, x) => s + x.kills, 0);
         return tk === 0 ? 0 : (p.kills + p.assists) / tk;
     });
 
-    let weights;
-    if (role === 'UTILITY') {
-        weights = { kda: 0.30, cs: 0.05, damage: 0.10, kp: 0.30, vision: 0.25 };
-    } else if (role === 'JUNGLE') {
-        weights = { kda: 0.25, cs: 0.20, damage: 0.15, kp: 0.25, vision: 0.15 };
-    } else {
-        weights = { kda: 0.25, cs: 0.30, damage: 0.25, kp: 0.10, vision: 0.10 };
-    }
+    let w;
+    if (role === 'UTILITY') w = { kda: 0.30, cs: 0.05, damage: 0.10, kp: 0.30, vision: 0.25 };
+    else if (role === 'JUNGLE') w = { kda: 0.25, cs: 0.20, damage: 0.15, kp: 0.25, vision: 0.15 };
+    else w = { kda: 0.25, cs: 0.30, damage: 0.25, kp: 0.10, vision: 0.10 };
 
-    const rawScore =
-        ratio(myKda, avgKda) * weights.kda +
-        ratio(myCs, avgCs) * weights.cs +
-        ratio(myDamage, avgDamage) * weights.damage +
-        ratio(myKp, avgKp) * weights.kp +
-        ratio(myVision, avgVision) * weights.vision;
+    const raw = ratio(myKda, avgKda) * w.kda + ratio(myCs, avgCs) * w.cs +
+        ratio(myDamage, avgDamage) * w.damage + ratio(myKp, avgKp) * w.kp + ratio(myVision, avgVision) * w.vision;
 
-    let score = Math.round(rawScore * 50);
+    let score = Math.round(raw * 50);
     if (participant.win === true || participant.win === 'Win') score += 5;
     return Math.min(Math.max(score, 0), 100);
 }
@@ -180,14 +150,13 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     const wardsPlaced = participant.wardsPlaced || 0;
     const champLevel = participant.champLevel;
     const queueName = QUEUE_NAMES[match.info.queueId] || 'Ranked';
-
     const teamParticipants = match.info.participants.filter(p => p.teamId === participant.teamId);
-    const teamKills = teamParticipants.reduce((sum, p) => sum + p.kills, 0);
-    const teamDeaths = teamParticipants.reduce((sum, p) => sum + p.deaths, 0);
-    const teamAssists = teamParticipants.reduce((sum, p) => sum + p.assists, 0);
+    const teamKills = teamParticipants.reduce((s, p) => s + p.kills, 0);
+    const teamDeaths = teamParticipants.reduce((s, p) => s + p.deaths, 0);
+    const teamAssists = teamParticipants.reduce((s, p) => s + p.assists, 0);
     const kp = teamKills === 0 ? '0%' : `${Math.round(((kills + assists) / teamKills) * 100)}%`;
-
     const score = calculateScore(participant, match);
+    const sColor = scoreColor(score);
 
     let multikill = '';
     if (participant.pentaKills > 0) multikill = 'PENTA KILL';
@@ -195,7 +164,12 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     else if (participant.tripleKills > 0) multikill = 'Triple Kill';
     else if (participant.doubleKills > 0) multikill = 'Double Kill';
 
-    // Fond splash art
+    // Champion circle position
+    const champX = 88;
+    const champY = 132;
+    const champR = 56;
+
+    // ── BACKGROUND ──────────────────────────────────────────────────────────
     const splashSource = SPLASH[champion] || `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${champion}_0.jpg`;
     const splash = await fetchImage(splashSource);
     if (splash) {
@@ -205,82 +179,116 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         ctx.drawImage(splash, (WIDTH - sw) / 2, (HEIGHT - sh) / 2, sw, sh);
     }
 
-    // Overlay dégradé
+    // Gradient left→right
     const grad = ctx.createLinearGradient(0, 0, WIDTH, 0);
-    grad.addColorStop(0, 'rgba(10,10,20,0.97)');
-    grad.addColorStop(0.5, 'rgba(10,10,20,0.88)');
-    grad.addColorStop(1, 'rgba(10,10,20,0.35)');
+    grad.addColorStop(0, 'rgba(8,8,18,0.98)');
+    grad.addColorStop(0.38, 'rgba(8,8,18,0.95)');
+    grad.addColorStop(0.65, 'rgba(8,8,18,0.78)');
+    grad.addColorStop(1, 'rgba(8,8,18,0.22)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-    // Barre couleur gauche
+    // ── TOP COLORED BORDER ──────────────────────────────────────────────────
     ctx.fillStyle = win ? '#2ecc71' : '#e74c3c';
-    ctx.fillRect(0, 0, 5, HEIGHT);
+    ctx.fillRect(0, 0, WIDTH, 4);
 
-    // Icône champion
-    const champSource = CHAMPIONS[champion];
-    const champIconUrl = champSource || `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${champion}.png`;
+    // ── CHAMPION CIRCLE ─────────────────────────────────────────────────────
+    const champSrc = CHAMPIONS[champion];
+    const champIconUrl = champSrc || `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${champion}.png`;
     const champIcon = await fetchImage(champIconUrl);
     if (champIcon) {
         ctx.save();
         ctx.beginPath();
-        ctx.arc(70, 78, 48, 0, Math.PI * 2);
+        ctx.arc(champX, champY, champR, 0, Math.PI * 2);
         ctx.clip();
-        ctx.drawImage(champIcon, 22, 30, 96, 96);
+        ctx.drawImage(champIcon, champX - champR, champY - champR, champR * 2, champR * 2);
         ctx.restore();
-        ctx.strokeStyle = win ? '#2ecc71' : '#e74c3c';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = win ? 'rgba(46,204,113,0.5)' : 'rgba(231,76,60,0.5)';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(70, 78, 48, 0, Math.PI * 2);
+        ctx.arc(champX, champY, champR, 0, Math.PI * 2);
         ctx.stroke();
     }
 
-    // Badge niveau champion
-    roundRect(ctx, 46, 112, 48, 20, 4);
-    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    // ── SCORE ARC RING ──────────────────────────────────────────────────────
+    const arcR = champR + 11;
+    // Background ring
+    ctx.beginPath();
+    ctx.arc(champX, champY, arcR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    // Score portion
+    const arcStart = -Math.PI / 2;
+    const arcEnd = arcStart + (score / 100) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.arc(champX, champY, arcR, arcStart, arcEnd);
+    ctx.strokeStyle = sColor;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+
+    // ── LEVEL BADGE ─────────────────────────────────────────────────────────
+    const badgeY = champY + champR - 12;
+    roundRect(ctx, champX - 24, badgeY, 48, 18, 4);
+    ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.fill();
     ctx.fillStyle = '#c89b3c';
-    ctx.font = 'bold 12px sans-serif';
+    ctx.font = 'bold 11px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText(`Niv. ${champLevel}`, 70, 126);
+    ctx.fillText(`Niv. ${champLevel}`, champX, badgeY + 13);
 
-    // Nom du champion
-    ctx.fillStyle = '#aaaaaa';
+    // ── CHAMPION NAME ────────────────────────────────────────────────────────
+    ctx.fillStyle = '#777777';
     ctx.font = '12px sans-serif';
-    ctx.fillText(champion, 70, 148);
+    ctx.fillText(champion, champX, champY + champR + 22);
 
-    // Score /100
-    const sColor = scoreColor(score);
-    ctx.font = 'bold 26px sans-serif';
+    // ── SCORE /100 ───────────────────────────────────────────────────────────
+    ctx.font = 'bold 28px sans-serif';
     ctx.fillStyle = sColor;
-    ctx.fillText(`${score}`, 70, 178);
-    ctx.fillStyle = '#666666';
+    ctx.fillText(`${score}`, champX, champY + champR + 52);
+    ctx.fillStyle = '#444444';
     ctx.font = '11px sans-serif';
-    ctx.fillText('/100', 70, 192);
+    ctx.fillText('/100', champX, champY + champR + 67);
     ctx.textAlign = 'left';
 
-    // Résultat
-    ctx.fillStyle = win ? '#2ecc71' : '#e74c3c';
-    ctx.font = 'bold 26px sans-serif';
-    ctx.fillText(win ? 'VICTOIRE' : 'DEFAITE', 140, 58);
+    // ── RESULT PILL ──────────────────────────────────────────────────────────
+    const hx = 188;
+    const resultText = win ? 'VICTOIRE' : 'DEFAITE';
+    const resultColor = win ? '#2ecc71' : '#e74c3c';
+    ctx.font = 'bold 12px sans-serif';
+    const rw = ctx.measureText(resultText).width + 26;
+    roundRect(ctx, hx, 14, rw, 24, 12);
+    ctx.fillStyle = win ? 'rgba(46,204,113,0.12)' : 'rgba(231,76,60,0.12)';
+    ctx.fill();
+    roundRect(ctx, hx, 14, rw, 24, 12);
+    ctx.strokeStyle = resultColor;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = resultColor;
+    ctx.textAlign = 'center';
+    ctx.fillText(resultText, hx + rw / 2, 30);
+    ctx.textAlign = 'left';
 
-    // Pseudo du joueur
+    // ── PLAYER NAME ──────────────────────────────────────────────────────────
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 22px sans-serif';
-    ctx.fillText(player.displayName, 140, 90);
+    ctx.font = 'bold 30px sans-serif';
+    ctx.fillText(player.displayName, hx, 76);
 
-    // Queue et durée
-    ctx.fillStyle = '#aaaaaa';
-    ctx.font = '14px sans-serif';
-    ctx.fillText(`${queueName}  |  ${gameDuration} min`, 140, 115);
+    // ── QUEUE + DURATION ─────────────────────────────────────────────────────
+    ctx.fillStyle = '#777777';
+    ctx.font = '13px sans-serif';
+    ctx.fillText(`${queueName}  •  ${gameDuration} min`, hx, 98);
 
+    // ── MULTIKILL ────────────────────────────────────────────────────────────
     if (multikill) {
         ctx.fillStyle = '#f39c12';
-        ctx.font = 'bold 14px sans-serif';
-        ctx.fillText(multikill, 140, 140);
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillText(multikill, hx, 120);
     }
 
-    // Logo et infos de rang
+    // ── RANK ─────────────────────────────────────────────────────────────────
     if (rankInfo?.solo) {
         const r = rankInfo.solo;
         const rankColor = RANK_COLORS[r.tier] || '#ffffff';
@@ -290,202 +298,214 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         const rankLogoUrl = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/ranked-emblem/emblem-${r.tier.toLowerCase()}.png`;
         const rankLogo = await fetchImage(rankLogoUrl);
         if (rankLogo) {
-            const logoSize = 230;
-            const ratio = rankLogo.width / rankLogo.height;
-            const logoW = logoSize * ratio;
-            const logoH = logoSize;
-            ctx.drawImage(rankLogo, -35, 70, logoW, logoH);
+            const lh = 185;
+            const lw = lh * (rankLogo.width / rankLogo.height);
+            ctx.drawImage(rankLogo, -25, 75, lw, lh);
         }
 
         ctx.fillStyle = rankColor;
-        ctx.font = 'bold 17px sans-serif';
-        ctx.fillText(noDiv ? r.tier : `${r.tier} ${r.rank}`, 220, 172);
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillText(noDiv ? r.tier : `${r.tier} ${r.rank}`, 228, 158);
 
-        ctx.fillStyle = '#dddddd';
+        ctx.fillStyle = '#bbbbbb';
         ctx.font = '13px sans-serif';
-        ctx.fillText(`${r.leaguePoints} LP  |  ${r.wins}V / ${r.losses}D  |  ${winrate}% WR`, 220, 192);
+        ctx.fillText(`${r.leaguePoints} LP  •  ${r.wins}V / ${r.losses}D  •  ${winrate}% WR`, 228, 178);
 
         if (!noDiv) {
-            const barX = 220;
-            const barY = 200;
-            const barW = 200;
-            const barH = 6;
-            roundRect(ctx, barX, barY, barW, barH, 3);
-            ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            const bx = 228, by = 188, bw = 220, bh = 5;
+            roundRect(ctx, bx, by, bw, bh, 3);
+            ctx.fillStyle = 'rgba(255,255,255,0.1)';
             ctx.fill();
-            roundRect(ctx, barX, barY, Math.round(barW * (r.leaguePoints / 100)), barH, 3);
+            roundRect(ctx, bx, by, Math.round(bw * r.leaguePoints / 100), bh, 3);
             ctx.fillStyle = rankColor;
             ctx.fill();
         }
     }
 
-    // Séparateur
-    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    // ── SEPARATOR 1 ──────────────────────────────────────────────────────────
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(25, 228);
-    ctx.lineTo(620, 228);
+    ctx.moveTo(15, 275);
+    ctx.lineTo(WIDTH - 15, 275);
     ctx.stroke();
 
-    // Blocs stats
-    const ACCENT = '#2ecc71';
+    // ── STATS ────────────────────────────────────────────────────────────────
     const stats = [
         { label: 'KDA', value: `${kills} / ${deaths} / ${assists}`, sub: `Ratio ${kda}`, colored: true },
         { label: 'CS', value: cs.toString(), sub: `${csPerMin}/min`, colored: false },
         { label: 'Vision', value: visionScore.toString(), sub: `${wardsPlaced} wards`, colored: false },
-        { label: 'Degats', value: `${damage}k`, sub: 'aux champions', colored: false },
+        { label: 'Degats', value: `${damage}k`, sub: 'aux champs', colored: false },
         { label: 'Kill Part.', value: kp, sub: '', colored: false },
     ];
 
-    const statY = 240;
-    const statW = 108;
-    const statH = 95;
-    const statGap = 10;
-    const statStartX = 25;
+    const sY = 285, sH = 108, sW = 112, sGap = 8, sX = 15;
 
     stats.forEach((stat, i) => {
-        const x = statStartX + i * (statW + statGap);
+        const x = sX + i * (sW + sGap);
 
-        roundRect(ctx, x, statY, statW, statH, 8);
-        ctx.fillStyle = 'rgba(255,255,255,0.05)';
+        roundRect(ctx, x, sY, sW, sH, 8);
+        ctx.fillStyle = 'rgba(255,255,255,0.04)';
         ctx.fill();
-
-        roundRect(ctx, x, statY, statW, statH, 8);
-        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        roundRect(ctx, x, sY, sW, sH, 8);
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        roundRect(ctx, x, statY, statW, 3, 2);
-        ctx.fillStyle = stat.colored ? kdaColor(kdaRatio) : ACCENT;
+        // Top accent
+        roundRect(ctx, x, sY, sW, 3, 2);
+        ctx.fillStyle = stat.colored ? kdaColor(kdaRatio) : '#2ecc71';
         ctx.fill();
 
-        ctx.fillStyle = '#888888';
-        ctx.font = '11px sans-serif';
+        const cx = x + sW / 2;
         ctx.textAlign = 'center';
-        ctx.fillText(stat.label, x + statW / 2, statY + 20);
+
+        ctx.fillStyle = '#555555';
+        ctx.font = '10px sans-serif';
+        ctx.fillText(stat.label.toUpperCase(), cx, sY + 18);
 
         ctx.fillStyle = stat.colored ? kdaColor(kdaRatio) : '#ffffff';
-        ctx.font = `bold ${stat.value.length > 9 ? '13px' : '19px'} sans-serif`;
-        ctx.fillText(stat.value, x + statW / 2, statY + 58);
+        ctx.font = `bold ${stat.value.length > 9 ? '13px' : '20px'} sans-serif`;
+        ctx.fillText(stat.value, cx, sY + 63);
 
         if (stat.sub) {
-            ctx.fillStyle = '#666666';
+            ctx.fillStyle = '#4a4a4a';
             ctx.font = '11px sans-serif';
-            ctx.fillText(stat.sub, x + statW / 2, statY + 78);
+            ctx.fillText(stat.sub, cx, sY + 83);
         }
     });
 
     ctx.textAlign = 'left';
 
-    // Compos 5v5
-    const team1 = match.info.participants.filter(p => p.teamId === 100);
-    const team2 = match.info.participants.filter(p => p.teamId === 200);
-    const champSize = 32;
-    const compoY = HEIGHT - champSize - 30;
-    const team2StartX = 25 + 5 * (champSize + 4) + 30;
+    // ── ITEMS (right of stats) ───────────────────────────────────────────────
+    const itemIds = [
+        participant.item0, participant.item1, participant.item2,
+        participant.item3, participant.item4, participant.item5,
+    ].filter(id => id > 0);
 
-    // KDA team du bon côté
-    const isBlue = participant.teamId === 100;
-    const teamKdaStr = `${teamKills} / ${teamDeaths} / ${teamAssists}`;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '10px sans-serif';
-    if (isBlue) {
-        ctx.fillText(teamKdaStr, 25, HEIGHT - 5);
-    } else {
-        ctx.fillText(teamKdaStr, team2StartX, HEIGHT - 5);
+    const iSize = 33;
+    const iX = sX + 5 * (sW + sGap) + 14;
+    const iY = sY + 10;
+
+    for (let i = 0; i < itemIds.length; i++) {
+        const col = i % 3;
+        const row = Math.floor(i / 3);
+        const x = iX + col * (iSize + 4);
+        const y = iY + row * (iSize + 4);
+        const imgUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemIds[i]}.png`;
+        const img = await fetchImage(imgUrl);
+        roundRect(ctx, x, y, iSize, iSize, 5);
+        if (img) {
+            ctx.save(); ctx.clip();
+            ctx.drawImage(img, x, y, iSize, iSize);
+            ctx.restore();
+        } else {
+            ctx.fillStyle = 'rgba(255,255,255,0.05)';
+            ctx.fill();
+        }
     }
 
-    ctx.fillStyle = '#555555';
-    ctx.font = '11px sans-serif';
-    ctx.fillText('Blue Side', 25, compoY - 5);
-    ctx.fillText('Red Side', team2StartX, compoY - 5);
+    if (participant.item6 > 0) {
+        const trinketUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${participant.item6}.png`;
+        const trinket = await fetchImage(trinketUrl);
+        const tx = iX + 3 * (iSize + 4) + 8;
+        roundRect(ctx, tx, iY, iSize, iSize, 5);
+        if (trinket) {
+            ctx.save(); ctx.clip();
+            ctx.drawImage(trinket, tx, iY, iSize, iSize);
+            ctx.restore();
+        }
+    }
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 13px sans-serif';
+    // ── SEPARATOR 2 ──────────────────────────────────────────────────────────
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(15, 405);
+    ctx.lineTo(WIDTH - 15, 405);
+    ctx.stroke();
+
+    // ── 5v5 COMPOS (centered) ────────────────────────────────────────────────
+    const team1 = match.info.participants.filter(p => p.teamId === 100);
+    const team2 = match.info.participants.filter(p => p.teamId === 200);
+    const cSize = 34;
+    const cGap = 6;
+    const cY = 418;
+
+    // Center the compos
+    const oneTeamW = 5 * (cSize + cGap) - cGap;
+    const vsAreaW = 44;
+    const totalW = oneTeamW * 2 + vsAreaW;
+    const cStartX = Math.round((WIDTH - totalW) / 2);
+    const vsCenter = cStartX + oneTeamW + vsAreaW / 2;
+    const t2StartX = cStartX + oneTeamW + vsAreaW;
+
+    const isBlue = participant.teamId === 100;
+    const teamKdaStr = `${teamKills} / ${teamDeaths} / ${teamAssists}`;
+
+    // Blue Side label
+    ctx.fillStyle = '#3d7fd4';
+    ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('VS', 25 + 5 * (champSize + 4) + 14, compoY + 20);
+    ctx.fillText('BLUE SIDE', cStartX + oneTeamW / 2, cY - 8);
+    if (isBlue) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '9px sans-serif';
+        ctx.fillText(teamKdaStr, cStartX + oneTeamW / 2, cY - 8 + 11);
+    }
+
+    // Red Side label
+    ctx.fillStyle = '#d44040';
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText('RED SIDE', t2StartX + oneTeamW / 2, cY - 8);
+    if (!isBlue) {
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '9px sans-serif';
+        ctx.fillText(teamKdaStr, t2StartX + oneTeamW / 2, cY - 8 + 11);
+    }
+
+    // VS
+    ctx.fillStyle = '#444444';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.fillText('VS', vsCenter, cY + cSize / 2 + 5);
     ctx.textAlign = 'left';
 
     for (const [teamIndex, team] of [team1, team2].entries()) {
-        const offsetX = teamIndex === 0 ? 25 : team2StartX;
+        const offsetX = teamIndex === 0 ? cStartX : t2StartX;
         for (let i = 0; i < team.length; i++) {
             const p = team[i];
-            const x = offsetX + i * (champSize + 4);
+            const x = offsetX + i * (cSize + cGap);
             const isTracked = p.puuid === participant.puuid;
             const iconUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${p.championName}.png`;
             const icon = await fetchImage(iconUrl);
 
             ctx.save();
             ctx.beginPath();
-            ctx.arc(x + champSize / 2, compoY + champSize / 2, champSize / 2, 0, Math.PI * 2);
+            ctx.arc(x + cSize / 2, cY + cSize / 2, cSize / 2, 0, Math.PI * 2);
             ctx.clip();
             if (icon) {
-                ctx.drawImage(icon, x, compoY, champSize, champSize);
+                ctx.drawImage(icon, x, cY, cSize, cSize);
             } else {
-                ctx.fillStyle = '#333333';
-                ctx.fillRect(x, compoY, champSize, champSize);
+                ctx.fillStyle = '#2a2a2a';
+                ctx.fillRect(x, cY, cSize, cSize);
             }
             ctx.restore();
 
-            ctx.strokeStyle = isTracked ? '#ffffff' : 'rgba(255,255,255,0.2)';
+            ctx.strokeStyle = isTracked ? '#ffffff' : 'rgba(255,255,255,0.15)';
             ctx.lineWidth = isTracked ? 2.5 : 1;
             ctx.beginPath();
-            ctx.arc(x + champSize / 2, compoY + champSize / 2, champSize / 2, 0, Math.PI * 2);
+            ctx.arc(x + cSize / 2, cY + cSize / 2, cSize / 2, 0, Math.PI * 2);
             ctx.stroke();
 
             const pKda = `${p.kills}/${p.deaths}/${p.assists}`;
             ctx.fillStyle = isTracked ? '#ffffff' : playerKdaColor(p);
             ctx.font = `${isTracked ? 'bold ' : ''}9px sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText(pKda, x + champSize / 2, compoY + champSize + 12);
+            ctx.fillText(pKda, x + cSize / 2, cY + cSize + 13);
         }
     }
 
     ctx.textAlign = 'left';
-
-    // Items à droite des équipes
-    const itemIds = [
-        participant.item0, participant.item1, participant.item2,
-        participant.item3, participant.item4, participant.item5,
-    ].filter(id => id > 0);
-
-    const itemSize = 30;
-    const itemStartX = team2StartX + 5 * (champSize + 4) + 15;
-    const itemStartY = compoY;
-
-    for (let i = 0; i < itemIds.length; i++) {
-        const col = i % 3;
-        const row = Math.floor(i / 3);
-        const x = itemStartX + col * (itemSize + 3);
-        const y = itemStartY + row * (itemSize + 3);
-        const imgUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${itemIds[i]}.png`;
-        const img = await fetchImage(imgUrl);
-        roundRect(ctx, x, y, itemSize, itemSize, 4);
-        if (img) {
-            ctx.save();
-            ctx.clip();
-            ctx.drawImage(img, x, y, itemSize, itemSize);
-            ctx.restore();
-        } else {
-            ctx.fillStyle = 'rgba(255,255,255,0.08)';
-            ctx.fill();
-        }
-    }
-
-    // Trinket
-    if (participant.item6 > 0) {
-        const trinketUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/item/${participant.item6}.png`;
-        const trinket = await fetchImage(trinketUrl);
-        const tx = itemStartX + 3 * (itemSize + 3) + 6;
-        roundRect(ctx, tx, itemStartY, itemSize, itemSize, 4);
-        if (trinket) {
-            ctx.save();
-            ctx.clip();
-            ctx.drawImage(trinket, tx, itemStartY, itemSize, itemSize);
-            ctx.restore();
-        }
-    }
-
     return canvas.toBuffer('image/png');
 }
 
