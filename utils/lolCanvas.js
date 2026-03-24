@@ -90,6 +90,16 @@ function kdaColor(ratio) {
     return '#e74c3c';
 }
 
+// Couleur KDA selon rôle : support = (kills+assists)/deaths, autres = kills/deaths
+function playerKdaColor(p) {
+    const isSupport = p.teamPosition === 'UTILITY';
+    if (p.deaths === 0) return '#2ecc71';
+    const score = isSupport
+        ? (p.kills + p.assists) / p.deaths
+        : p.kills / p.deaths;
+    return score >= 1 ? '#2ecc71' : '#e74c3c';
+}
+
 async function generateMatchCard(player, participant, match, rankInfo) {
     const version = await getDdragonVersion();
     const canvas = createCanvas(WIDTH, HEIGHT);
@@ -111,9 +121,10 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     const champLevel = participant.champLevel;
     const queueName = QUEUE_NAMES[match.info.queueId] || 'Ranked';
 
-    const teamKills = match.info.participants
-        .filter(p => p.teamId === participant.teamId)
-        .reduce((sum, p) => sum + p.kills, 0);
+    const teamParticipants = match.info.participants.filter(p => p.teamId === participant.teamId);
+    const teamKills = teamParticipants.reduce((sum, p) => sum + p.kills, 0);
+    const teamDeaths = teamParticipants.reduce((sum, p) => sum + p.deaths, 0);
+    const teamAssists = teamParticipants.reduce((sum, p) => sum + p.assists, 0);
     const kp = teamKills === 0 ? '0%' : `${Math.round(((kills + assists) / teamKills) * 100)}%`;
 
     let multikill = '';
@@ -245,8 +256,8 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.lineTo(620, 228);
     ctx.stroke();
 
-    // Blocs stats améliorés
-    const statAccentColors = ['#00e5ff', '#a8e063', '#b39ddb', '#ff8a65', '#f06292'];
+    // Blocs stats — design propre, 1 couleur accent
+    const ACCENT = '#2ecc71';
     const stats = [
         { label: 'KDA', value: `${kills} / ${deaths} / ${assists}`, sub: `Ratio ${kda}`, colored: true },
         { label: 'CS', value: cs.toString(), sub: `${csPerMin}/min`, colored: false },
@@ -263,54 +274,55 @@ async function generateMatchCard(player, participant, match, rankInfo) {
 
     stats.forEach((stat, i) => {
         const x = statStartX + i * (statW + statGap);
-        const accent = statAccentColors[i];
 
         // Fond du bloc
         roundRect(ctx, x, statY, statW, statH, 8);
-        ctx.fillStyle = 'rgba(255,255,255,0.06)';
+        ctx.fillStyle = 'rgba(255,255,255,0.05)';
         ctx.fill();
 
-        // Ligne colorée en haut
+        // Bordure subtile
+        roundRect(ctx, x, statY, statW, statH, 8);
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Ligne accent en haut
         roundRect(ctx, x, statY, statW, 3, 2);
-        ctx.fillStyle = accent;
+        ctx.fillStyle = stat.colored ? kdaColor(kdaRatio) : ACCENT;
         ctx.fill();
 
         // Label
-        ctx.fillStyle = accent;
-        ctx.font = 'bold 11px sans-serif';
+        ctx.fillStyle = '#888888';
+        ctx.font = '11px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(stat.label, x + statW / 2, statY + 18);
+        ctx.fillText(stat.label, x + statW / 2, statY + 20);
 
         // Valeur principale
-        if (stat.colored) {
-            ctx.fillStyle = kdaColor(kdaRatio);
-        } else {
-            ctx.fillStyle = '#ffffff';
-        }
-        ctx.font = `bold ${stat.value.length > 9 ? '13px' : '18px'} sans-serif`;
-        ctx.fillText(stat.value, x + statW / 2, statY + 56);
+        ctx.fillStyle = stat.colored ? kdaColor(kdaRatio) : '#ffffff';
+        ctx.font = `bold ${stat.value.length > 9 ? '13px' : '19px'} sans-serif`;
+        ctx.fillText(stat.value, x + statW / 2, statY + 58);
 
         // Sous-valeur
         if (stat.sub) {
-            if (stat.colored) {
-                ctx.fillStyle = kdaColor(kdaRatio);
-                ctx.globalAlpha = 0.8;
-            } else {
-                ctx.fillStyle = '#777777';
-            }
+            ctx.fillStyle = '#666666';
             ctx.font = '11px sans-serif';
-            ctx.fillText(stat.sub, x + statW / 2, statY + 76);
-            ctx.globalAlpha = 1;
+            ctx.fillText(stat.sub, x + statW / 2, statY + 78);
         }
     });
 
     ctx.textAlign = 'left';
 
-    // Compos 5v5 avec KDA sous chaque champion
+    // Compos 5v5 avec KDA et KDA global team
     const team1 = match.info.participants.filter(p => p.teamId === 100);
     const team2 = match.info.participants.filter(p => p.teamId === 200);
     const champSize = 32;
     const compoY = HEIGHT - champSize - 30;
+
+    // KDA global de la team du joueur suivi
+    const teamKdaStr = `Team : ${teamKills} / ${teamDeaths} / ${teamAssists}`;
+    ctx.fillStyle = '#666666';
+    ctx.font = '10px sans-serif';
+    ctx.fillText(teamKdaStr, 25, HEIGHT - 5);
 
     ctx.fillStyle = '#555555';
     ctx.font = '11px sans-serif';
@@ -334,7 +346,6 @@ async function generateMatchCard(player, participant, match, rankInfo) {
             const iconUrl = `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${p.championName}.png`;
             const icon = await fetchImage(iconUrl);
 
-            // Icône
             ctx.save();
             ctx.beginPath();
             ctx.arc(x + champSize / 2, compoY + champSize / 2, champSize / 2, 0, Math.PI * 2);
@@ -347,7 +358,6 @@ async function generateMatchCard(player, participant, match, rankInfo) {
             }
             ctx.restore();
 
-            // Bordure
             ctx.strokeStyle = isTracked ? '#c89b3c' : 'rgba(255,255,255,0.2)';
             ctx.lineWidth = isTracked ? 2.5 : 1;
             ctx.beginPath();
@@ -356,8 +366,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
 
             // KDA sous l'icône
             const pKda = `${p.kills}/${p.deaths}/${p.assists}`;
-            const pRatio = p.deaths === 0 ? null : (p.kills + p.assists) / p.deaths;
-            ctx.fillStyle = isTracked ? '#c89b3c' : kdaColor(pRatio);
+            ctx.fillStyle = isTracked ? '#c89b3c' : playerKdaColor(p);
             ctx.font = `${isTracked ? 'bold ' : ''}9px sans-serif`;
             ctx.textAlign = 'center';
             ctx.fillText(pKda, x + champSize / 2, compoY + champSize + 12);
@@ -366,7 +375,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
 
     ctx.textAlign = 'left';
 
-    // Items repositionnés à droite des équipes
+    // Items à droite des équipes
     const itemIds = [
         participant.item0, participant.item1, participant.item2,
         participant.item3, participant.item4, participant.item5,
