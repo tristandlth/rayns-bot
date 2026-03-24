@@ -36,6 +36,7 @@ const SPLASH = {
     'Jinx': path.join(__dirname, '../img/splash/jinx.png'),
     'Velkoz': path.join(__dirname, '../img/splash/velkoz.jpg'),
     'Lillia': path.join(__dirname, '../img/splash/lillia.jpg'),
+    'Singed': path.join(__dirname, '../img/splash/singed.png'),
 };
 
 let ddragonVersion = null;
