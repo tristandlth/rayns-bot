@@ -176,7 +176,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     else if (participant.doubleKills > 0) multikill = 'Double Kill';
 
     const champX = 88;
-    const champY = 135;
+    const champY = 120;
     const champR = 56;
 
     // ── BACKGROUND ──────────────────────────────────────────────────────────
@@ -303,9 +303,9 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         const rankLogoUrl = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/ranked-emblem/emblem-${r.tier.toLowerCase()}.png`;
         const rankLogo = await fetchImage(rankLogoUrl);
         if (rankLogo) {
-            const lh = 100;
-            const lw = lh * (rankLogo.width / rankLogo.height);
-            ctx.drawImage(rankLogo, 188, 118, lw, lh);
+            const logoSize = 230;
+            const lw = logoSize * (rankLogo.width / rankLogo.height);
+            ctx.drawImage(rankLogo, 148, 55, lw, logoSize);
         }
 
         ctx.fillStyle = rankColor;
