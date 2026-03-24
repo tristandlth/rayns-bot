@@ -305,7 +305,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         if (rankLogo) {
             const logoSize = 230;
             const lw = logoSize * (rankLogo.width / rankLogo.height);
-            ctx.drawImage(rankLogo, -20, 100, lw, logoSize);
+            ctx.drawImage(rankLogo, 35, 60, lw, logoSize);
         }
 
         ctx.fillStyle = rankColor;
