@@ -16,6 +16,14 @@ const client = new Client({
     ]
 });
 
+client.user.setPresence({
+    activities: [{
+        name: 'vos games ranked',
+        type: ActivityType.Watching,
+    }],
+    status: 'online',
+});
+
 client.commands = new Collection();
 const commandsArray = [];
 
