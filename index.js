@@ -1,7 +1,7 @@
 require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
-const { Client, Collection, GatewayIntentBits, Events, REST, Routes } = require('discord.js');
+const { Client, Collection, GatewayIntentBits, Events, REST, Routes, ActivityType } = require('discord.js');
 const { initDb, initLolTables } = require('./utils/db');
 const { checkStravaActivities } = require('./utils/strava');
 const { checkLolGames } = require('./utils/lol');
