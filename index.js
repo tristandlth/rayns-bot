@@ -16,14 +16,6 @@ const client = new Client({
     ]
 });
 
-client.user.setPresence({
-    activities: [{
-        name: 'vos games ranked',
-        type: ActivityType.Watching,
-    }],
-    status: 'online',
-});
-
 client.commands = new Collection();
 const commandsArray = [];
 
@@ -56,6 +48,15 @@ for (const file of eventFiles) {
 
 client.once(Events.ClientReady, async () => {
     console.log(`✅ Connecté en tant que ${client.user.tag}`);
+
+    client.user.setPresence({
+        activities: [{
+            name: 'vos games ranked',
+            type: ActivityType.Watching,
+        }],
+        status: 'online',
+    });
+
 
     await initDb();
     await initLolTables();
