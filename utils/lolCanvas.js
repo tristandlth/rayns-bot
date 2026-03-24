@@ -3,7 +3,7 @@ const axios = require('axios');
 const path = require('path');
 
 const WIDTH = 900;
-const HEIGHT = 490;
+const HEIGHT = 510;
 
 const RANK_COLORS = {
     IRON: '#8a8a8a', BRONZE: '#ad5f26', SILVER: '#a0a8b0', GOLD: '#c89b3c',
@@ -150,10 +150,21 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     const wardsPlaced = participant.wardsPlaced || 0;
     const champLevel = participant.champLevel;
     const queueName = QUEUE_NAMES[match.info.queueId] || 'Ranked';
-    const teamParticipants = match.info.participants.filter(p => p.teamId === participant.teamId);
-    const teamKills = teamParticipants.reduce((s, p) => s + p.kills, 0);
-    const teamDeaths = teamParticipants.reduce((s, p) => s + p.deaths, 0);
-    const teamAssists = teamParticipants.reduce((s, p) => s + p.assists, 0);
+
+    const isBlue = participant.teamId === 100;
+    const myTeamId = participant.teamId;
+    const enemyTeamId = myTeamId === 100 ? 200 : 100;
+
+    const myTeam = match.info.participants.filter(p => p.teamId === myTeamId);
+    const enemyTeam = match.info.participants.filter(p => p.teamId === enemyTeamId);
+
+    const teamKills = myTeam.reduce((s, p) => s + p.kills, 0);
+    const teamDeaths = myTeam.reduce((s, p) => s + p.deaths, 0);
+    const teamAssists = myTeam.reduce((s, p) => s + p.assists, 0);
+    const enemyKills = enemyTeam.reduce((s, p) => s + p.kills, 0);
+    const enemyDeaths = enemyTeam.reduce((s, p) => s + p.deaths, 0);
+    const enemyAssists = enemyTeam.reduce((s, p) => s + p.assists, 0);
+
     const kp = teamKills === 0 ? '0%' : `${Math.round(((kills + assists) / teamKills) * 100)}%`;
     const score = calculateScore(participant, match);
     const sColor = scoreColor(score);
@@ -164,9 +175,8 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     else if (participant.tripleKills > 0) multikill = 'Triple Kill';
     else if (participant.doubleKills > 0) multikill = 'Double Kill';
 
-    // Champion circle position
     const champX = 88;
-    const champY = 132;
+    const champY = 155;
     const champR = 56;
 
     // ── BACKGROUND ──────────────────────────────────────────────────────────
@@ -179,7 +189,6 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         ctx.drawImage(splash, (WIDTH - sw) / 2, (HEIGHT - sh) / 2, sw, sh);
     }
 
-    // Gradient left→right
     const grad = ctx.createLinearGradient(0, 0, WIDTH, 0);
     grad.addColorStop(0, 'rgba(8,8,18,0.98)');
     grad.addColorStop(0.38, 'rgba(8,8,18,0.95)');
@@ -188,11 +197,29 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-    // ── TOP COLORED BORDER ──────────────────────────────────────────────────
+    // ── TOP BORDER ───────────────────────────────────────────────────────────
     ctx.fillStyle = win ? '#2ecc71' : '#e74c3c';
     ctx.fillRect(0, 0, WIDTH, 4);
 
-    // ── CHAMPION CIRCLE ─────────────────────────────────────────────────────
+    // ── RESULT PILL (au-dessus du champion) ──────────────────────────────────
+    const resultText = win ? 'VICTOIRE' : 'DEFAITE';
+    const resultColor = win ? '#2ecc71' : '#e74c3c';
+    ctx.font = 'bold 12px sans-serif';
+    const rw = ctx.measureText(resultText).width + 26;
+    const pillX = champX - rw / 2;
+    roundRect(ctx, pillX, 10, rw, 24, 12);
+    ctx.fillStyle = win ? 'rgba(46,204,113,0.12)' : 'rgba(231,76,60,0.12)';
+    ctx.fill();
+    roundRect(ctx, pillX, 10, rw, 24, 12);
+    ctx.strokeStyle = resultColor;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = resultColor;
+    ctx.textAlign = 'center';
+    ctx.fillText(resultText, champX, 26);
+    ctx.textAlign = 'left';
+
+    // ── CHAMPION CIRCLE ──────────────────────────────────────────────────────
     const champSrc = CHAMPIONS[champion];
     const champIconUrl = champSrc || `https://ddragon.leagueoflegends.com/cdn/${version}/img/champion/${champion}.png`;
     const champIcon = await fetchImage(champIconUrl);
@@ -210,15 +237,13 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         ctx.stroke();
     }
 
-    // ── SCORE ARC RING ──────────────────────────────────────────────────────
+    // ── SCORE ARC RING ───────────────────────────────────────────────────────
     const arcR = champR + 11;
-    // Background ring
     ctx.beginPath();
     ctx.arc(champX, champY, arcR, 0, Math.PI * 2);
     ctx.strokeStyle = 'rgba(255,255,255,0.08)';
     ctx.lineWidth = 5;
     ctx.stroke();
-    // Score portion
     const arcStart = -Math.PI / 2;
     const arcEnd = arcStart + (score / 100) * Math.PI * 2;
     ctx.beginPath();
@@ -229,7 +254,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.stroke();
     ctx.lineCap = 'butt';
 
-    // ── LEVEL BADGE ─────────────────────────────────────────────────────────
+    // ── LEVEL BADGE ──────────────────────────────────────────────────────────
     const badgeY = champY + champR - 12;
     roundRect(ctx, champX - 24, badgeY, 48, 18, 4);
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
@@ -239,56 +264,36 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     ctx.textAlign = 'center';
     ctx.fillText(`Niv. ${champLevel}`, champX, badgeY + 13);
 
-    // ── CHAMPION NAME ────────────────────────────────────────────────────────
+    // ── CHAMPION NAME + SCORE ─────────────────────────────────────────────────
     ctx.fillStyle = '#777777';
     ctx.font = '12px sans-serif';
-    ctx.fillText(champion, champX, champY + champR + 22);
+    ctx.fillText(champion, champX, champY + champR + 24);
 
-    // ── SCORE /100 ───────────────────────────────────────────────────────────
     ctx.font = 'bold 28px sans-serif';
     ctx.fillStyle = sColor;
-    ctx.fillText(`${score}`, champX, champY + champR + 52);
+    ctx.fillText(`${score}`, champX, champY + champR + 54);
     ctx.fillStyle = '#444444';
     ctx.font = '11px sans-serif';
-    ctx.fillText('/100', champX, champY + champR + 67);
+    ctx.fillText('/100', champX, champY + champR + 69);
     ctx.textAlign = 'left';
 
-    // ── RESULT PILL ──────────────────────────────────────────────────────────
-    const hx = 188;
-    const resultText = win ? 'VICTOIRE' : 'DEFAITE';
-    const resultColor = win ? '#2ecc71' : '#e74c3c';
-    ctx.font = 'bold 12px sans-serif';
-    const rw = ctx.measureText(resultText).width + 26;
-    roundRect(ctx, hx, 14, rw, 24, 12);
-    ctx.fillStyle = win ? 'rgba(46,204,113,0.12)' : 'rgba(231,76,60,0.12)';
-    ctx.fill();
-    roundRect(ctx, hx, 14, rw, 24, 12);
-    ctx.strokeStyle = resultColor;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.fillStyle = resultColor;
-    ctx.textAlign = 'center';
-    ctx.fillText(resultText, hx + rw / 2, 30);
-    ctx.textAlign = 'left';
-
-    // ── PLAYER NAME ──────────────────────────────────────────────────────────
+    // ── PLAYER NAME + QUEUE ───────────────────────────────────────────────────
+    const hx = 190;
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 30px sans-serif';
     ctx.fillText(player.displayName, hx, 76);
 
-    // ── QUEUE + DURATION ─────────────────────────────────────────────────────
     ctx.fillStyle = '#777777';
     ctx.font = '13px sans-serif';
     ctx.fillText(`${queueName}  •  ${gameDuration} min`, hx, 98);
 
-    // ── MULTIKILL ────────────────────────────────────────────────────────────
     if (multikill) {
         ctx.fillStyle = '#f39c12';
         ctx.font = 'bold 13px sans-serif';
         ctx.fillText(multikill, hx, 120);
     }
 
-    // ── RANK ─────────────────────────────────────────────────────────────────
+    // ── RANK ──────────────────────────────────────────────────────────────────
     if (rankInfo?.solo) {
         const r = rankInfo.solo;
         const rankColor = RANK_COLORS[r.tier] || '#ffffff';
@@ -298,21 +303,21 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         const rankLogoUrl = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/ranked-emblem/emblem-${r.tier.toLowerCase()}.png`;
         const rankLogo = await fetchImage(rankLogoUrl);
         if (rankLogo) {
-            const lh = 185;
+            const lh = 75;
             const lw = lh * (rankLogo.width / rankLogo.height);
-            ctx.drawImage(rankLogo, -25, 75, lw, lh);
+            ctx.drawImage(rankLogo, 190, 140, lw, lh);
         }
 
         ctx.fillStyle = rankColor;
         ctx.font = 'bold 18px sans-serif';
-        ctx.fillText(noDiv ? r.tier : `${r.tier} ${r.rank}`, 228, 158);
+        ctx.fillText(noDiv ? r.tier : `${r.tier} ${r.rank}`, 275, 165);
 
         ctx.fillStyle = '#bbbbbb';
         ctx.font = '13px sans-serif';
-        ctx.fillText(`${r.leaguePoints} LP  •  ${r.wins}V / ${r.losses}D  •  ${winrate}% WR`, 228, 178);
+        ctx.fillText(`${r.leaguePoints} LP  •  ${r.wins}V / ${r.losses}D  •  ${winrate}% WR`, 275, 185);
 
         if (!noDiv) {
-            const bx = 228, by = 188, bw = 220, bh = 5;
+            const bx = 275, by = 195, bw = 220, bh = 5;
             roundRect(ctx, bx, by, bw, bh, 3);
             ctx.fillStyle = 'rgba(255,255,255,0.1)';
             ctx.fill();
@@ -322,15 +327,15 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         }
     }
 
-    // ── SEPARATOR 1 ──────────────────────────────────────────────────────────
+    // ── SEPARATOR 1 ───────────────────────────────────────────────────────────
     ctx.strokeStyle = 'rgba(255,255,255,0.07)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(15, 275);
-    ctx.lineTo(WIDTH - 15, 275);
+    ctx.moveTo(15, 280);
+    ctx.lineTo(WIDTH - 15, 280);
     ctx.stroke();
 
-    // ── STATS ────────────────────────────────────────────────────────────────
+    // ── STATS ─────────────────────────────────────────────────────────────────
     const stats = [
         { label: 'KDA', value: `${kills} / ${deaths} / ${assists}`, sub: `Ratio ${kda}`, colored: true },
         { label: 'CS', value: cs.toString(), sub: `${csPerMin}/min`, colored: false },
@@ -339,7 +344,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         { label: 'Kill Part.', value: kp, sub: '', colored: false },
     ];
 
-    const sY = 285, sH = 108, sW = 112, sGap = 8, sX = 15;
+    const sY = 290, sH = 108, sW = 112, sGap = 8, sX = 15;
 
     stats.forEach((stat, i) => {
         const x = sX + i * (sW + sGap);
@@ -352,7 +357,6 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         ctx.lineWidth = 1;
         ctx.stroke();
 
-        // Top accent
         roundRect(ctx, x, sY, sW, 3, 2);
         ctx.fillStyle = stat.colored ? kdaColor(kdaRatio) : '#2ecc71';
         ctx.fill();
@@ -377,7 +381,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
 
     ctx.textAlign = 'left';
 
-    // ── ITEMS (right of stats) ───────────────────────────────────────────────
+    // ── ITEMS ─────────────────────────────────────────────────────────────────
     const itemIds = [
         participant.item0, participant.item1, participant.item2,
         participant.item3, participant.item4, participant.item5,
@@ -417,22 +421,21 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         }
     }
 
-    // ── SEPARATOR 2 ──────────────────────────────────────────────────────────
+    // ── SEPARATOR 2 ───────────────────────────────────────────────────────────
     ctx.strokeStyle = 'rgba(255,255,255,0.07)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(15, 405);
-    ctx.lineTo(WIDTH - 15, 405);
+    ctx.moveTo(15, 410);
+    ctx.lineTo(WIDTH - 15, 410);
     ctx.stroke();
 
-    // ── 5v5 COMPOS (centered) ────────────────────────────────────────────────
+    // ── 5v5 COMPOS ────────────────────────────────────────────────────────────
     const team1 = match.info.participants.filter(p => p.teamId === 100);
     const team2 = match.info.participants.filter(p => p.teamId === 200);
     const cSize = 34;
     const cGap = 6;
-    const cY = 418;
+    const cY = 450;
 
-    // Center the compos
     const oneTeamW = 5 * (cSize + cGap) - cGap;
     const vsAreaW = 44;
     const totalW = oneTeamW * 2 + vsAreaW;
@@ -440,29 +443,30 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     const vsCenter = cStartX + oneTeamW + vsAreaW / 2;
     const t2StartX = cStartX + oneTeamW + vsAreaW;
 
-    const isBlue = participant.teamId === 100;
-    const teamKdaStr = `${teamKills} / ${teamDeaths} / ${teamAssists}`;
+    // KDA équipe du joueur
+    const myKdaStr = `${teamKills} / ${teamDeaths} / ${teamAssists}`;
+    // KDA équipe adverse
+    const enemyKdaStr = `${enemyKills} / ${enemyDeaths} / ${enemyAssists}`;
 
-    // Blue Side label
+    const blueKdaStr = isBlue ? myKdaStr : enemyKdaStr;
+    const redKdaStr = isBlue ? enemyKdaStr : myKdaStr;
+
+    // Blue Side
     ctx.fillStyle = '#3d7fd4';
     ctx.font = 'bold 10px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('BLUE SIDE', cStartX + oneTeamW / 2, cY - 8);
-    if (isBlue) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '9px sans-serif';
-        ctx.fillText(teamKdaStr, cStartX + oneTeamW / 2, cY - 8 + 11);
-    }
+    ctx.fillText('BLUE SIDE', cStartX + oneTeamW / 2, 418);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '9px sans-serif';
+    ctx.fillText(blueKdaStr, cStartX + oneTeamW / 2, 430);
 
-    // Red Side label
+    // Red Side
     ctx.fillStyle = '#d44040';
     ctx.font = 'bold 10px sans-serif';
-    ctx.fillText('RED SIDE', t2StartX + oneTeamW / 2, cY - 8);
-    if (!isBlue) {
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '9px sans-serif';
-        ctx.fillText(teamKdaStr, t2StartX + oneTeamW / 2, cY - 8 + 11);
-    }
+    ctx.fillText('RED SIDE', t2StartX + oneTeamW / 2, 418);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '9px sans-serif';
+    ctx.fillText(redKdaStr, t2StartX + oneTeamW / 2, 430);
 
     // VS
     ctx.fillStyle = '#444444';
