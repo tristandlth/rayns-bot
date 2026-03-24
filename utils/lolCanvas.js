@@ -176,7 +176,7 @@ async function generateMatchCard(player, participant, match, rankInfo) {
     else if (participant.doubleKills > 0) multikill = 'Double Kill';
 
     const champX = 88;
-    const champY = 155;
+    const champY = 135;
     const champR = 56;
 
     // ── BACKGROUND ──────────────────────────────────────────────────────────
@@ -303,21 +303,21 @@ async function generateMatchCard(player, participant, match, rankInfo) {
         const rankLogoUrl = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/ranked-emblem/emblem-${r.tier.toLowerCase()}.png`;
         const rankLogo = await fetchImage(rankLogoUrl);
         if (rankLogo) {
-            const lh = 75;
+            const lh = 100;
             const lw = lh * (rankLogo.width / rankLogo.height);
-            ctx.drawImage(rankLogo, 190, 140, lw, lh);
+            ctx.drawImage(rankLogo, 188, 118, lw, lh);
         }
 
         ctx.fillStyle = rankColor;
         ctx.font = 'bold 18px sans-serif';
-        ctx.fillText(noDiv ? r.tier : `${r.tier} ${r.rank}`, 275, 165);
+        ctx.fillText(noDiv ? r.tier : `${r.tier} ${r.rank}`, 288, 155);
 
         ctx.fillStyle = '#bbbbbb';
         ctx.font = '13px sans-serif';
-        ctx.fillText(`${r.leaguePoints} LP  •  ${r.wins}V / ${r.losses}D  •  ${winrate}% WR`, 275, 185);
+        ctx.fillText(`${r.leaguePoints} LP  •  ${r.wins}V / ${r.losses}D  •  ${winrate}% WR`, 288, 175);
 
         if (!noDiv) {
-            const bx = 275, by = 195, bw = 220, bh = 5;
+            const bx = 288, by = 185, bw = 220, bh = 5;
             roundRect(ctx, bx, by, bw, bh, 3);
             ctx.fillStyle = 'rgba(255,255,255,0.1)';
             ctx.fill();
