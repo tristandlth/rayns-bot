@@ -53,15 +53,15 @@ const addXp = async (userId, xpToAdd, type = 'text') => {
 
         const newXp = user.experience + xpToAdd;
         const currentLevel = user.level;
-        const nextLevelXp = 75 * ((currentLevel + 1) ** 2);
         let newLevel = currentLevel;
 
-        if (newXp >= nextLevelXp) {
+        // on avance tant qu'on dépasse le seuil — gère les sauts de plusieurs niveaux d'un coup
+        while (newXp >= 75 * ((newLevel + 1) ** 2)) {
             newLevel++;
         }
 
         const msgIncrement = type === 'text' ? 1 : 0;
-        const voiceIncrement = type === 'voice' ? (xpToAdd / 10) : 0;
+        const voiceIncrement = type === 'voice' ? (xpToAdd / 15) : 0;
 
         await client.query(`
             INSERT INTO levels (user_id, experience, level, msg_count, voice_min, last_message_date)
@@ -77,11 +77,11 @@ const addXp = async (userId, xpToAdd, type = 'text') => {
             userId, newXp, newLevel, msgIncrement, voiceIncrement, Date.now()
         ]);
 
-        return { oldLevel: currentLevel, newLevel };
+        return { oldLevel: currentLevel, newLevel, newXp };
 
     } catch (err) {
         console.error("Erreur addXp:", err);
-        return { oldLevel: 0, newLevel: 0 };
+        return { oldLevel: 0, newLevel: 0, newXp: 0 };
     } finally {
         client.release();
     }

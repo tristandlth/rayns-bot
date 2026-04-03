@@ -51,26 +51,33 @@ async function sendActivityEmbed(channel, activity) {
     }
 
     const distanceKm = (activity.distance / 1000).toFixed(2);
-    const timeMin = Math.floor(activity.moving_time / 60);
     const elevation = Math.floor(activity.total_elevation_gain);
-    
+
+    // format "1h 23min" plutôt que "83 min"
+    const totalMinutes = Math.floor(activity.moving_time / 60);
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    const timeFormatted = hours > 0 ? `${hours}h ${mins}min` : `${mins}min`;
+
     const secondsPerKm = activity.distance > 0 ? activity.moving_time / (activity.distance / 1000) : 0;
     const paceMinutes = Math.floor(secondsPerKm / 60);
     const paceSeconds = Math.floor(secondsPerKm % 60).toString().padStart(2, '0');
     const pace = `${paceMinutes}:${paceSeconds}/km`;
 
-    const embed = createBaseEmbed({ 
-        username: `${activity.athlete.firstname} ${activity.athlete.lastname}`, 
-        displayAvatarURL: () => avatarUrl 
+    const ACTIVITY_EMOJI = { Run: '🏃', Ride: '🚴', VirtualRide: '🚴', Walk: '🚶', Swim: '🏊', Hike: '🥾' };
+    const activityEmoji = ACTIVITY_EMOJI[activity.type] || '🏅';
+
+    const embed = createBaseEmbed({
+        username: `${activity.athlete.firstname} ${activity.athlete.lastname}`,
+        displayAvatarURL: () => avatarUrl
     })
     .setColor('#fc4c02')
-    .setTitle(`🏃 ${activity.name}`)
-    .setDescription(`Activité du club`)
+    .setTitle(`${activityEmoji} ${activity.name}`)
     .addFields(
         { name: 'Distance', value: `${distanceKm} km`, inline: true },
-        { name: 'Duree', value: `${timeMin} min`, inline: true },
-        { name: 'Allure', value: `${pace}`, inline: true },
-        { name: 'Denivele', value: `${elevation} m`, inline: true }
+        { name: 'Durée', value: timeFormatted, inline: true },
+        { name: 'Allure', value: pace, inline: true },
+        { name: 'Dénivelé', value: `${elevation} m`, inline: true }
     );
 
     const payload = { embeds: [embed] };
