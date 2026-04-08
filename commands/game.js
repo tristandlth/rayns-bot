@@ -149,9 +149,17 @@ module.exports = {
 
             // add / settop → recherche IGDB (value = ID uniquement, max 100 chars)
             if (!query) return interaction.respond([]);
-            const games = await searchGames(query, 10);
+            const games = await searchGames(query, 25);
+            // Déduplique par nom affiché pour éviter les doublons multi-plateformes
+            const seen = new Set();
+            const unique = games.filter(g => {
+                const label = g.year ? `${g.name} (${g.year})` : g.name;
+                if (seen.has(label)) return false;
+                seen.add(label);
+                return true;
+            });
             return interaction.respond(
-                games.map(g => ({
+                unique.slice(0, 10).map(g => ({
                     name: g.year ? `${g.name} (${g.year})` : g.name,
                     value: String(g.id),
                 }))
