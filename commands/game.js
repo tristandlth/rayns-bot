@@ -6,7 +6,7 @@ const {
     ButtonBuilder,
     ButtonStyle,
 } = require('discord.js');
-const { searchGames } = require('../utils/igdb');
+const { searchGames, getGame } = require('../utils/igdb');
 const {
     addGameReview,
     removeGameReview,
@@ -17,17 +17,6 @@ const {
 } = require('../utils/db');
 
 const STARS = ['', '★☆☆☆☆', '★★☆☆☆', '★★★☆☆', '★★★★☆', '★★★★★'];
-
-// Encode les infos d'un jeu dans la value de l'autocomplete
-function encodeGameValue(game) {
-    return `${game.id}|${game.name}|${game.coverUrl || ''}`;
-}
-
-// Décode la value de l'autocomplete
-function decodeGameValue(value) {
-    const [idStr, name, coverUrl] = value.split('|');
-    return { id: parseInt(idStr), name, coverUrl: coverUrl || null };
-}
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -140,7 +129,7 @@ module.exports = {
                 return interaction.respond(
                     games.slice(0, 25).map(g => ({
                         name: g.game_name,
-                        value: `${g.game_id}|${g.game_name}|${g.game_cover_url || ''}`,
+                        value: String(g.game_id),
                     }))
                 );
             }
@@ -153,18 +142,18 @@ module.exports = {
                 return interaction.respond(
                     games.slice(0, 25).map(g => ({
                         name: g.game_name,
-                        value: `${g.game_id}|${g.game_name}|${g.game_cover_url || ''}`,
+                        value: String(g.game_id),
                     }))
                 );
             }
 
-            // add / settop → recherche IGDB
+            // add / settop → recherche IGDB (value = ID uniquement, max 100 chars)
             if (!query) return interaction.respond([]);
             const games = await searchGames(query, 10);
             return interaction.respond(
                 games.map(g => ({
                     name: g.year ? `${g.name} (${g.year})` : g.name,
-                    value: encodeGameValue(g),
+                    value: String(g.id),
                 }))
             );
         } catch (err) {
@@ -183,10 +172,8 @@ module.exports = {
             const note = interaction.options.getInteger('note');
             const review = interaction.options.getString('review');
 
-            let gameId, gameName, coverUrl;
-            try {
-                ({ id: gameId, name: gameName, coverUrl } = decodeGameValue(rawGame));
-            } catch {
+            const gameId = parseInt(rawGame);
+            if (isNaN(gameId)) {
                 return interaction.reply({
                     content: '❌ Jeu invalide. Utilise l\'autocomplete pour sélectionner un jeu.',
                     flags: MessageFlags.Ephemeral,
@@ -194,6 +181,12 @@ module.exports = {
             }
 
             await interaction.deferReply();
+
+            const gameData = await getGame(gameId);
+            if (!gameData) {
+                return interaction.editReply('❌ Jeu introuvable sur IGDB. Réessaie.');
+            }
+            const { name: gameName, coverUrl } = gameData;
 
             const ok = await addGameReview(interaction.user.id, gameId, gameName, coverUrl, note, review);
             if (!ok) {
@@ -215,16 +208,18 @@ module.exports = {
         // ── /game remove ──────────────────────────────────────────────────────
         if (sub === 'remove') {
             const rawGame = interaction.options.getString('jeu');
+            const gameId = parseInt(rawGame);
 
-            let gameId, gameName;
-            try {
-                ({ id: gameId, name: gameName } = decodeGameValue(rawGame));
-            } catch {
+            if (isNaN(gameId)) {
                 return interaction.reply({
                     content: '❌ Jeu invalide. Utilise l\'autocomplete.',
                     flags: MessageFlags.Ephemeral,
                 });
             }
+
+            // Récupère le nom depuis la BDD (plus besoin d'appel IGDB)
+            const existing = await getUserGameReview(interaction.user.id, gameId);
+            const gameName = existing?.game_name ?? `Jeu #${gameId}`;
 
             const row = new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
@@ -266,11 +261,9 @@ module.exports = {
         if (sub === 'check') {
             const targetUser = interaction.options.getUser('utilisateur');
             const rawGame = interaction.options.getString('jeu');
+            const gameId = parseInt(rawGame);
 
-            let gameId, gameName;
-            try {
-                ({ id: gameId, name: gameName } = decodeGameValue(rawGame));
-            } catch {
+            if (isNaN(gameId)) {
                 return interaction.reply({
                     content: '❌ Jeu invalide. Utilise l\'autocomplete.',
                     flags: MessageFlags.Ephemeral,
@@ -281,7 +274,7 @@ module.exports = {
 
             const entry = await getUserGameReview(targetUser.id, gameId);
             if (!entry) {
-                return interaction.editReply(`**${targetUser.displayName}** n'a pas encore noté **${gameName}**.`);
+                return interaction.editReply(`**${targetUser.displayName}** n'a pas encore noté ce jeu.`);
             }
 
             const embed = new EmbedBuilder()
@@ -335,11 +328,9 @@ module.exports = {
         if (sub === 'settop') {
             const rawGame = interaction.options.getString('jeu');
             const position = interaction.options.getInteger('position');
+            const gameId = parseInt(rawGame);
 
-            let gameId, gameName, coverUrl;
-            try {
-                ({ id: gameId, name: gameName, coverUrl } = decodeGameValue(rawGame));
-            } catch {
+            if (isNaN(gameId)) {
                 return interaction.reply({
                     content: '❌ Jeu invalide. Utilise l\'autocomplete.',
                     flags: MessageFlags.Ephemeral,
@@ -347,6 +338,12 @@ module.exports = {
             }
 
             await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+            const gameData = await getGame(gameId);
+            if (!gameData) {
+                return interaction.editReply('❌ Jeu introuvable sur IGDB. Réessaie.');
+            }
+            const { name: gameName, coverUrl } = gameData;
 
             const ok = await setTopGame(interaction.user.id, position, gameId, gameName, coverUrl);
             if (!ok) {
