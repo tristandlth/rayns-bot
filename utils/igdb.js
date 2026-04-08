@@ -43,11 +43,15 @@ function normalizeCoverUrl(url) {
 
 async function searchGames(query, limit = 10) {
     const escaped = query.replace(/"/g, '\\"');
+    // On utilise `where name ~` plutôt que `search` pour l'autocomplete :
+    // - supporte le prefix matching (partiel)
+    // - compatible avec `sort` et `where category`
     // category : 0=jeu principal, 4=standalone expansion, 8=remake, 9=remaster, 10=expanded game
+    // version_parent = null : exclut les éditions GOTY/Deluxe/etc.
     const body = `
-        search "${escaped}";
-        fields id, name, cover.url, first_release_date, category;
-        where category = (0,4,8,9,10);
+        fields id, name, cover.url, first_release_date;
+        where name ~ *"${escaped}"* & category = (0,4,8,9,10) & version_parent = null;
+        sort first_release_date desc;
         limit ${limit};
     `;
     const games = await igdbRequest('games', body);
