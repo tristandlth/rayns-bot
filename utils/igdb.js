@@ -43,9 +43,11 @@ function normalizeCoverUrl(url) {
 
 async function searchGames(query, limit = 10) {
     const escaped = query.replace(/"/g, '\\"');
+    // category : 0=jeu principal, 4=standalone expansion, 8=remake, 9=remaster, 10=expanded game
     const body = `
         search "${escaped}";
-        fields id, name, cover.url, first_release_date;
+        fields id, name, cover.url, first_release_date, category;
+        where category = (0,4,8,9,10);
         limit ${limit};
     `;
     const games = await igdbRequest('games', body);
