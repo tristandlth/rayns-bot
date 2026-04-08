@@ -3,6 +3,18 @@ const { MessageFlags } = require('discord.js');
 module.exports = {
     name: 'interactionCreate',
     async execute(interaction) {
+        if (interaction.isAutocomplete()) {
+            const command = interaction.client.commands.get(interaction.commandName);
+            if (command?.autocomplete) {
+                try {
+                    await command.autocomplete(interaction);
+                } catch (err) {
+                    console.error('Erreur autocomplete:', err);
+                }
+            }
+            return;
+        }
+
         if (!interaction.isChatInputCommand()) return;
 
         const command = interaction.client.commands.get(interaction.commandName);

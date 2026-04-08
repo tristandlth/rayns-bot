@@ -239,12 +239,135 @@ const getLolPlayerByRiotId = async (riotId) => {
     }
 };
 
-module.exports = { 
-    initDb, 
-    addXp, 
-    getLeaderboard, 
-    getUserRank, 
-    getStravaLastId, 
+// GAME TRACKING
+const initGameTables = async () => {
+    const client = await pool.connect();
+    try {
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS game_reviews (
+                id SERIAL PRIMARY KEY,
+                user_id VARCHAR(255) NOT NULL,
+                game_id INTEGER NOT NULL,
+                game_name VARCHAR(255) NOT NULL,
+                game_cover_url TEXT,
+                rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+                review TEXT,
+                added_at BIGINT DEFAULT 0,
+                UNIQUE(user_id, game_id)
+            );
+        `);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS game_top (
+                user_id VARCHAR(255) NOT NULL,
+                position SMALLINT NOT NULL CHECK (position BETWEEN 1 AND 5),
+                game_id INTEGER NOT NULL,
+                game_name VARCHAR(255) NOT NULL,
+                game_cover_url TEXT,
+                PRIMARY KEY (user_id, position)
+            );
+        `);
+        console.log("✅ Tables Game vérifiées.");
+    } catch (err) {
+        console.error("❌ Erreur init tables Game:", err);
+    } finally {
+        client.release();
+    }
+};
+
+const addGameReview = async (userId, gameId, gameName, coverUrl, rating, review) => {
+    try {
+        await pool.query(`
+            INSERT INTO game_reviews (user_id, game_id, game_name, game_cover_url, rating, review, added_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (user_id, game_id) DO UPDATE SET
+                game_name = $3,
+                game_cover_url = $4,
+                rating = $5,
+                review = $6,
+                added_at = $7;
+        `, [userId, gameId, gameName, coverUrl, rating, review || null, Date.now()]);
+        return true;
+    } catch (err) {
+        console.error("❌ Erreur addGameReview:", err);
+        return false;
+    }
+};
+
+const removeGameReview = async (userId, gameId) => {
+    try {
+        const res = await pool.query(
+            'DELETE FROM game_reviews WHERE user_id = $1 AND game_id = $2 RETURNING *',
+            [userId, gameId]
+        );
+        return res.rowCount > 0;
+    } catch (err) {
+        console.error("❌ Erreur removeGameReview:", err);
+        return false;
+    }
+};
+
+const getUserGameReview = async (userId, gameId) => {
+    try {
+        const res = await pool.query(
+            'SELECT * FROM game_reviews WHERE user_id = $1 AND game_id = $2',
+            [userId, gameId]
+        );
+        return res.rows[0] || null;
+    } catch (err) {
+        console.error("❌ Erreur getUserGameReview:", err);
+        return null;
+    }
+};
+
+const getUserGames = async (userId, search = '') => {
+    try {
+        const res = await pool.query(
+            `SELECT * FROM game_reviews WHERE user_id = $1 AND LOWER(game_name) LIKE LOWER($2) ORDER BY added_at DESC`,
+            [userId, `%${search}%`]
+        );
+        return res.rows;
+    } catch (err) {
+        console.error("❌ Erreur getUserGames:", err);
+        return [];
+    }
+};
+
+const setTopGame = async (userId, position, gameId, gameName, coverUrl) => {
+    try {
+        await pool.query(`
+            INSERT INTO game_top (user_id, position, game_id, game_name, game_cover_url)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (user_id, position) DO UPDATE SET
+                game_id = $3,
+                game_name = $4,
+                game_cover_url = $5;
+        `, [userId, position, gameId, gameName, coverUrl]);
+        return true;
+    } catch (err) {
+        console.error("❌ Erreur setTopGame:", err);
+        return false;
+    }
+};
+
+const getUserTop = async (userId) => {
+    try {
+        const res = await pool.query(
+            'SELECT * FROM game_top WHERE user_id = $1 ORDER BY position ASC',
+            [userId]
+        );
+        return res.rows;
+    } catch (err) {
+        console.error("❌ Erreur getUserTop:", err);
+        return [];
+    }
+};
+
+module.exports = {
+    initDb,
+    addXp,
+    getLeaderboard,
+    getUserRank,
+    getStravaLastId,
     updateStravaLastId,
     // LoL
     initLolTables,
@@ -254,4 +377,12 @@ module.exports = {
     getLolLastMatchId,
     updateLolLastMatchId,
     getLolPlayerByRiotId,
+    // Game
+    initGameTables,
+    addGameReview,
+    removeGameReview,
+    getUserGameReview,
+    getUserGames,
+    setTopGame,
+    getUserTop,
 };

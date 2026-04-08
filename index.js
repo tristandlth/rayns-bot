@@ -2,7 +2,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { Client, Collection, GatewayIntentBits, Events, REST, Routes, ActivityType } = require('discord.js');
-const { initDb, initLolTables } = require('./utils/db');
+const { initDb, initLolTables, initGameTables } = require('./utils/db');
 const { checkStravaActivities } = require('./utils/strava');
 const { checkLolGames } = require('./utils/lol');
 
@@ -60,6 +60,7 @@ client.once(Events.ClientReady, async () => {
 
     await initDb();
     await initLolTables();
+    await initGameTables();
 
     const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
