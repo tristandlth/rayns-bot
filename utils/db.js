@@ -27,8 +27,14 @@ const initDb = async () => {
         `);
 
         await client.query(`
-            INSERT INTO bot_settings (key, value) 
-            VALUES ('strava_last_id', '0') 
+            INSERT INTO bot_settings (key, value)
+            VALUES ('strava_last_id', '0')
+            ON CONFLICT (key) DO NOTHING;
+        `);
+
+        await client.query(`
+            INSERT INTO bot_settings (key, value)
+            VALUES ('strava_seen_ids', '[]')
             ON CONFLICT (key) DO NOTHING;
         `);
 
@@ -126,21 +132,26 @@ const getUserRank = async (userId) => {
 };
 
 
-const getStravaLastId = async () => {
+const getSeenStravaIds = async () => {
     try {
-        const res = await pool.query("SELECT value FROM bot_settings WHERE key = 'strava_last_id'");
-        if (res.rows.length > 0) return res.rows[0].value;
-        return '0';
+        const res = await pool.query("SELECT value FROM bot_settings WHERE key = 'strava_seen_ids'");
+        if (res.rows.length > 0) return new Set(JSON.parse(res.rows[0].value || '[]'));
+        return new Set();
     } catch (err) {
         console.error("❌ Erreur lecture DB Strava:", err);
-        return '0';
+        return new Set();
     }
 };
 
-const updateStravaLastId = async (newId) => {
+const markStravaIdsAsSeen = async (ids) => {
     try {
-        await pool.query("UPDATE bot_settings SET value = $1 WHERE key = 'strava_last_id'", [String(newId)]);
-        console.log(`💾 ID Strava sauvegardé : ${newId}`);
+        const res = await pool.query("SELECT value FROM bot_settings WHERE key = 'strava_seen_ids'");
+        const current = res.rows.length > 0 ? JSON.parse(res.rows[0].value || '[]') : [];
+        const updated = [...new Set([...current, ...ids])].slice(-100);
+        await pool.query(
+            "INSERT INTO bot_settings (key, value) VALUES ('strava_seen_ids', $1) ON CONFLICT (key) DO UPDATE SET value = $1",
+            [JSON.stringify(updated)]
+        );
     } catch (err) {
         console.error("❌ Erreur sauvegarde DB Strava:", err);
     }
@@ -367,8 +378,8 @@ module.exports = {
     addXp,
     getLeaderboard,
     getUserRank,
-    getStravaLastId,
-    updateStravaLastId,
+    getSeenStravaIds,
+    markStravaIdsAsSeen,
     // LoL
     initLolTables,
     getLolPlayers,

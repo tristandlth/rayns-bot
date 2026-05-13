@@ -2,7 +2,7 @@ const axios = require('axios');
 const fs = require('fs');
 const { AttachmentBuilder } = require('discord.js');
 const { createBaseEmbed } = require('./embeds');
-const { getStravaLastId, updateStravaLastId } = require('./db'); 
+const { getSeenStravaIds, markStravaIdsAsSeen } = require('./db');
 
 const AUTH_URL = 'https://www.strava.com/oauth/token';
 const CLUB_URL = `https://www.strava.com/api/v3/clubs/${process.env.STRAVA_CLUB_ID}/activities`;
@@ -13,13 +13,9 @@ const ATTACHMENT_NAME = 'strava.png';
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 function ensureActivityId(activity) {
-    if (activity.id) return activity; 
-
-    const cleanName = (activity.athlete.firstname + activity.athlete.lastname).replace(/[^a-zA-Z0-9]/g, '');
-    const cleanTitle = (activity.name || 'Activite').replace(/[^a-zA-Z0-9]/g, '');
-    
-    activity.id = `${cleanName}_${cleanTitle}_${activity.moving_time}`;
-    
+    const cleanFirst = (activity.athlete.firstname || '').replace(/[^a-zA-Z0-9]/g, '');
+    const cleanLast = (activity.athlete.lastname || '').replace(/[^a-zA-Z0-9]/g, '');
+    activity.id = `${cleanFirst}${cleanLast}_${activity.moving_time}_${Math.round(activity.distance)}_${activity.elapsed_time}`;
     return activity;
 }
 
@@ -88,10 +84,9 @@ async function sendActivityEmbed(channel, activity) {
 
 async function checkStravaActivities(client) {
     console.log('🔄 Vérification Strava...');
-    
-    const lastKnownId = await getStravaLastId();
-    const token = await getAccessToken();
-    
+
+    const [seenIds, token] = await Promise.all([getSeenStravaIds(), getAccessToken()]);
+
     if (!token) return;
 
     const channel = client.channels.cache.get(process.env.STRAVA_CHANNEL_ID);
@@ -109,40 +104,29 @@ async function checkStravaActivities(client) {
         }
 
         const activities = res.data.map(act => ensureActivityId(act));
-        
-        if (!activities || activities.length === 0) return;
+        if (!activities.length) return;
 
-        if (lastKnownId === '0') {
-            const mostRecent = activities[0];
-            console.log(`🆕 Premier lancement détecté. Envoi de l'activité : ${mostRecent.id}`);
-            
-            await sendActivityEmbed(channel, mostRecent);
-            
-            await updateStravaLastId(mostRecent.id);
+        const fetchedIds = activities.map(a => a.id);
+
+        if (seenIds.size === 0) {
+            console.log(`🆕 Premier lancement détecté. Envoi de l'activité la plus récente.`);
+            await sendActivityEmbed(channel, activities[0]);
+            await markStravaIdsAsSeen(fetchedIds);
             return;
         }
 
-        const newActivities = [];
-        
-        for (const activity of activities) {
-            if (String(activity.id) === String(lastKnownId)) {
-                break;
-            }
-            newActivities.push(activity);
-        }
+        const newActivities = activities.filter(a => !seenIds.has(a.id)).reverse();
 
         if (newActivities.length === 0) return;
 
         console.log(`🚀 ${newActivities.length} nouvelle(s) activité(s) à envoyer !`);
 
-        const toSend = newActivities.reverse();
-
-        for (const activity of toSend) {
+        for (const activity of newActivities) {
             await sendActivityEmbed(channel, activity);
             await wait(3000);
         }
 
-        await updateStravaLastId(activities[0].id);
+        await markStravaIdsAsSeen(fetchedIds);
 
     } catch (error) {
         logStravaError(error);
