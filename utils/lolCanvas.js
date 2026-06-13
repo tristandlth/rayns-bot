@@ -19,7 +19,7 @@ const CHAMPIONS = {
     'Viktor': path.join(__dirname, '../img/icons/viktor.jpg'),
     'Ekko': path.join(__dirname, '../img/icons/ekko.jpg'),
     'Singed': path.join(__dirname, '../img/icons/singed.jpg'),
-    'Velkoz': path.join(__dirname, '../img/icons/velkoz.jpg'),
+    'Velkoz': path.join(__dirname, '../img/icons/velkoz.png'),
 };
 
 const SPLASH = {
