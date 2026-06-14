@@ -19,12 +19,12 @@ const CHAMPIONS = {
     'Viktor': path.join(__dirname, '../img/icons/viktor.jpg'),
     'Ekko': path.join(__dirname, '../img/icons/ekko.jpg'),
     'Singed': path.join(__dirname, '../img/icons/singed.jpg'),
-    'Velkoz': path.join(__dirname, '../img/icons/velkoz.png'),
+    'Velkoz': path.join(__dirname, '../img/icons/velkoz.jpg'),
 };
 
 const SPLASH = {
     'Jinx': path.join(__dirname, '../img/splash/jinx.png'),
-    'Velkoz': path.join(__dirname, '../img/splash/velkoz.jpg'),
+    'Velkoz': path.join(__dirname, '../img/splash/velkoz.png'),
     'Lillia': path.join(__dirname, '../img/splash/lillia.jpg'),
     'Singed': path.join(__dirname, '../img/splash/singed.png'),
 };
